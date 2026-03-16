@@ -2,7 +2,7 @@
 
 
 
-### openclaw
+### openclaw（不适合）
 
 1. github：[https://github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
 2. 其依赖的agent框架：[https://github.com/badlogic/pi-mono](https://github.com/badlogic/pi-mono)
