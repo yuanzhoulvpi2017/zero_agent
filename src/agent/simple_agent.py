@@ -1,3 +1,5 @@
+from typing import List
+
 from qwen_agent.agents import Assistant
 from qwen_agent.llm.schema import ASSISTANT, FUNCTION
 from qwen_agent.utils.output_beautify import (
@@ -6,7 +8,7 @@ from qwen_agent.utils.output_beautify import (
     TOOL_CALL_S,
     TOOL_RESULT_S,
 )
-from typing import List
+
 from ..config import LOCAL_IP
 
 

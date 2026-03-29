@@ -1,10 +1,9 @@
+import random
 from datetime import datetime
 
 from lunardate import LunarDate
-
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import TransportSecuritySettings
-import random
 
 
 def get_local_time_(detail=True):

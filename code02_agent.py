@@ -1,6 +1,8 @@
-from src.agent.simple_agent import typewriter_noprint
-from qwen_agent.agents import Assistant
 import os
+
+from qwen_agent.agents import Assistant
+
+from src.agent.simple_agent import typewriter_noprint
 from src.config import LOCAL_IP
 
 llm_cfg = {
