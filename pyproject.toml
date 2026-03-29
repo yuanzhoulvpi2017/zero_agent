@@ -1,0 +1,20 @@
+[project]
+name = "zero-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentscope>=1.0.18",
+    "fastapi>=0.135.2",
+    "jupyter>=1.1.1",
+    "lunardate>=0.2.2",
+    "mcp[cli]>=1.26.0",
+    "notebook>=7.5.5",
+    "openai>=2.30.0",
+    "qwen-agent>=0.0.34",
+    "ruff>=0.15.8",
+    "soundfile>=0.13.1",
+    "sse-starlette>=3.3.3",
+    "uvicorn>=0.42.0",
+]
