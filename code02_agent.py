@@ -7,7 +7,7 @@ from src.config import LOCAL_IP
 
 llm_cfg = {
     "model": "kimi-k2.5",
-    "api_key": os.getenv("KIMI_API_KEY"),
+    "api_key": os.getenv("KIMI_API_KEY"),  # "xxxxx"
     "model_server": "https://api.moonshot.cn/v1",
 }
 
@@ -58,4 +58,18 @@ def test003():
     print(result)
 
 
-test003()
+def test004():
+    test_message = [{"role": "user", "content": "你好，你是谁"}]
+
+    result = base_agent_(llm_cfg, messages=test_message)
+    print(result)
+
+
+def test005():
+    test_message = [{"role": "user", "content": "1+3然后再乘以2等于多少"}]
+
+    result = base_agent_(llm_cfg, messages=test_message)
+    print(result)
+
+
+test005()

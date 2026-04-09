@@ -1,0 +1,111 @@
+[
+    {
+        "name": "simple_tool-get_current_time",
+        "description": "获取当前时间: 详细的时间信息格式(包括公历和农历)",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "simple_tool-get_weather",
+        "description": "获取指定城市的天气信息",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "title": "City",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "city"
+            ]
+        }
+    },
+    {
+        "name": "simple_tool-add",
+        "description": "计算两个数的和",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "title": "A",
+                    "type": "number"
+                },
+                "b": {
+                    "title": "B",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "a",
+                "b"
+            ]
+        }
+    },
+    {
+        "name": "simple_tool-multiply",
+        "description": "计算两个数的积",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "title": "A",
+                    "type": "number"
+                },
+                "b": {
+                    "title": "B",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "a",
+                "b"
+            ]
+        }
+    },
+    {
+        "name": "simple_tool-devision",
+        "description": "计算两个数的商",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "title": "A",
+                    "type": "number"
+                },
+                "b": {
+                    "title": "B",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "a",
+                "b"
+            ]
+        }
+    },
+    {
+        "name": "simple_tool-minus",
+        "description": "计算两个数的差",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "a": {
+                    "title": "A",
+                    "type": "number"
+                },
+                "b": {
+                    "title": "B",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "a",
+                "b"
+            ]
+        }
+    }
+]

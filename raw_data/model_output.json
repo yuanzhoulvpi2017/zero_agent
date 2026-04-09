@@ -1,0 +1,24 @@
+[
+    {
+        "role": "assistant",
+        "content": "",
+        "reasoning_content": "用户问的是1+3等于多少。这是一个简单的加法问题，我可以使用simple_tool-add函数来计算。\n\n参数：\n- a: 1\n- b: 3\n\n我应该调用这个工具来给出准确的答案。",
+        "extra": {}
+    },
+    {
+        "role": "assistant",
+        "content": "我来帮你计算一下1+3的结果～\n\n",
+        "extra": {}
+    },
+    {
+        "role": "assistant",
+        "content": "",
+        "function_call": {
+            "name": "simple_tool-add",
+            "arguments": "{\"a\": 1, \"b\": 3}"
+        },
+        "extra": {
+            "function_id": "1"
+        }
+    }
+]
