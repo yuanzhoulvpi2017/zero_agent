@@ -1,7 +1,6 @@
-# intro agentscope react agent with kimi-k2.5 and a simple http tool
-
 import asyncio
 import os
+import time
 
 from agentscope.agent import ReActAgent
 from agentscope.mcp import HttpStatelessClient
@@ -9,13 +8,12 @@ from agentscope.memory import InMemoryMemory
 from agentscope.message import Msg
 from agentscope.model import OpenAIChatModel
 from agentscope.tool import Toolkit
-from pydantic import BaseModel, Field
 
 from src.agent.agentscope_add import KimiChatFormatter
 from src.config import LOCAL_IP
 
 
-async def call_agent(prompt: str) -> dict:
+async def call_agent_with_hook(prompt: str) -> dict:
 
     toolkit = Toolkit()
 
@@ -42,23 +40,44 @@ async def call_agent(prompt: str) -> dict:
         toolkit=toolkit,
         memory=InMemoryMemory(),
     )
+    agent.register_instance_hook(
+        "pre_reply",
+        hook_name="my_pre_reply_hook",
+        hook=lambda self, kwargs: print(f"Pre-reply hook called with kwargs: {kwargs}"),
+    )
+    agent.register_instance_hook(
+        "post_reply",
+        hook_name="my_post_reply_hook",
+        hook=lambda self, kwargs, output: print(
+            f"Post-reply hook called with kwargs: {kwargs} and output: {output}"
+        ),
+    )
+    _reply_start_time = {}
+
+    def pre_reply_timer(self, kwargs):
+        _reply_start_time["t"] = time.perf_counter()
+
+    def post_reply_timer(self, kwargs, output):
+        elapsed = time.perf_counter() - _reply_start_time["t"]
+        print(f"[计时] reply 耗时: {elapsed:.3f} 秒")
+
+    agent.register_instance_hook(
+        "pre_reply", hook_name="timer_pre", hook=pre_reply_timer
+    )
+    agent.register_instance_hook(
+        "post_reply", hook_name="timer_post", hook=post_reply_timer
+    )
 
     msg = Msg("User", prompt, "user")
     result_msg = await agent(msg)
     return result_msg
 
 
-def func1():
+def func4():
 
-    res = asyncio.run(call_agent("现在几点了？"))
+    res = asyncio.run(call_agent_with_hook("现在几点了？"))
     print(res)
 
 
-def func2():
-    res = asyncio.run(call_agent("帮我查一下今天的天气"))
-    print(res)
-
-
-def func3():
-    res = asyncio.run(call_agent("(1+3)*5等于多少"))
-    print(res)
+if __name__ == "__main__":
+    func4()
