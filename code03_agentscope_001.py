@@ -62,3 +62,10 @@ def func2():
 def func3():
     res = asyncio.run(call_agent("(1+3)*5等于多少"))
     print(res)
+
+
+
+if __name__ == "__main__":
+    func1()
+    func2()
+    func3()
