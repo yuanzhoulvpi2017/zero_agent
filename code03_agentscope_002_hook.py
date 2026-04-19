@@ -40,18 +40,18 @@ async def call_agent_with_hook(prompt: str) -> dict:
         toolkit=toolkit,
         memory=InMemoryMemory(),
     )
-    agent.register_instance_hook(
-        "pre_reply",
-        hook_name="my_pre_reply_hook",
-        hook=lambda self, kwargs: print(f"Pre-reply hook called with kwargs: {kwargs}"),
-    )
-    agent.register_instance_hook(
-        "post_reply",
-        hook_name="my_post_reply_hook",
-        hook=lambda self, kwargs, output: print(
-            f"Post-reply hook called with kwargs: {kwargs} and output: {output}"
-        ),
-    )
+    # agent.register_instance_hook(
+    #     "pre_reply",
+    #     hook_name="my_pre_reply_hook",
+    #     hook=lambda self, kwargs: print(f"Pre-reply hook called with kwargs: {kwargs}"),
+    # )
+    # agent.register_instance_hook(
+    #     "post_reply",
+    #     hook_name="my_post_reply_hook",
+    #     hook=lambda self, kwargs, output: print(
+    #         f"Post-reply hook called with kwargs: {kwargs} and output: {output}"
+    #     ),
+    # )
     _reply_start_time = {}
 
     def pre_reply_timer(self, kwargs):
