@@ -16,6 +16,21 @@
 
 
 
+## 实战开发目录
+
+实战代码按阶段组织，每个阶段内部按业务划分，业务名称保持一致。现有基础教程与示例保留在当前目录。
+
+| 目录 | 用途 |
+| --- | --- |
+| [agent/](agent/README.md) | Agent 开发、自定义工具、轨迹采集 |
+| [dataset/](dataset/README.md) | 轨迹清洗、过滤、标注与 SFT 数据生成 |
+| [training/](training/README.md) | 模型训练与导出 |
+| [evaluation/](evaluation/README.md) | 推理、评测与效果对比 |
+| [configs/](configs/README.md) | 按业务管理各阶段配置 |
+| [docs/](docs/README.md) | 业务导航、阶段教程与开发约定 |
+
+开始新业务时，请参照[业务开发指南](docs/README.md)。运行产物保存到 `artifacts/<业务名>/<实验编号>/`，不提交 Git。
+
 ## 常见问题解答（FAQ）
 
 ### 当前 Agent 开发是否有必要使用现有框架？

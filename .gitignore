@@ -208,3 +208,10 @@ __marimo__/
 test_*
 
 .DS_Store
+
+# Local experiment outputs
+/artifacts/
+
+# Local environment variants
+.env.*
+!.env.example
