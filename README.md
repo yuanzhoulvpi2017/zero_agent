@@ -26,6 +26,7 @@
 | [dataset/](dataset/README.md) | 轨迹清洗、过滤、标注与 SFT 数据生成 |
 | [training/](training/README.md) | 模型训练与导出 |
 | [evaluation/](evaluation/README.md) | 推理、评测与效果对比 |
+| [interface/](interface/README.md) | 统一用户交互界面，按业务组织 |
 | [configs/](configs/README.md) | 按业务管理各阶段配置 |
 | [docs/](docs/README.md) | 业务导航、阶段教程与开发约定 |
 
