@@ -47,7 +47,8 @@ def data_root() -> Path:
 
 
 def sessions_root() -> Path:
-    return data_root()
+    """Human / web chat sessions live under data/paper_trail/web/<session_id>/."""
+    return data_root() / "web"
 
 
 def constructed_root() -> Path:
@@ -65,9 +66,14 @@ def constructed_dirname(persona_id: str, session_id: str) -> str:
 def find_session_directory(session_id: str) -> Path | None:
     if not SESSION_ID.fullmatch(session_id or ""):
         return None
-    direct = sessions_root() / session_id
-    if (direct / "manifest.json").is_file():
-        return direct
+    candidates = (
+        sessions_root() / session_id,
+        # Legacy flat layout before web/ was introduced.
+        data_root() / session_id,
+    )
+    for direct in candidates:
+        if (direct / "manifest.json").is_file():
+            return direct
     root = constructed_root()
     if not root.is_dir():
         return None
@@ -610,7 +616,7 @@ Daily Papers 是社区精选，不能宣称覆盖全部最新论文；区分论�
                 "storage_kind": (
                     "constructed"
                     if self.directory.parent == constructed_root()
-                    else "chat"
+                    else "web"
                 ),
                 "storage_dir": str(self.directory.relative_to(ROOT)),
                 "training": None,

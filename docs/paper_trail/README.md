@@ -26,7 +26,7 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 uv run python -m run_paper_trail
 ```
 
-访问 http://127.0.0.1:8000。左侧是采集 / 数据 / 训练 / 评测子页面：当前可直接对话、查看历史对话和轨迹。示例问题：“我想了解最近 Agent 长期记忆方向，先帮我梳理几个分支。”每轮写入 `data/paper_trail/<session_id>/`，新建对话不会覆盖旧记录。`data/` 与模型文件不提交 Git。
+访问 http://127.0.0.1:8000。左侧是采集 / 数据 / 训练 / 评测子页面：当前可直接对话、查看历史对话和轨迹。示例问题：“我想了解最近 Agent 长期记忆方向，先帮我梳理几个分支。”每轮写入 `data/paper_trail/web/<session_id>/`，新建对话不会覆盖旧记录。`data/` 与模型文件不提交 Git。
 
 蒸馏采集（虚拟人，默认 flash、少量轮次；写入 `data/paper_trail/constructed/constructed__<persona>__<session_id>/`）：
 

@@ -10,6 +10,7 @@
 - 采样时带主话题、岔开话题、口吻和 `jump_plan`（含身份/人物追问）
 - **1 轮 = 用户一句 + 小埋一整轮回复**；单条对话最多 **20** 轮
 - 虚拟人提示刻意压「需求说明书」口吻：目标只作内心动机，开口要短、含糊，让小埋追问后再慢慢补
+- 每次采样写入 `prompt_version`（当前 `v6-human-shortchat-5`），便于按版本回溯构造数据
 
 只看采样、不花额度：
 
@@ -21,7 +22,7 @@ uv run python -m run_paper_trail_collect --dry-sample --count 8 --seed 7
 
 每次会话目录：
 
-- 人工网页对话：`data/paper_trail/<session_id>/`
+- 人工网页对话：`data/paper_trail/web/<session_id>/`
 - **虚拟人构造**：`data/paper_trail/constructed/constructed__<persona_id>__<session_id>/`
 
 一眼能看出是构造数据。目录内文件：
@@ -52,6 +53,9 @@ uv run python -m run_paper_trail_collect --count 10 --max-turns 20 --seed 7
 
 # 更快一点：并行 3 条
 uv run python -m run_paper_trail_collect --count 10 --max-turns 20 --seed 7 --concurrency 3
+
+# 持续构造到额度不够自动停
+uv run python -m run_paper_trail_collect --count 8 --max-turns 12 --seed 101 --concurrency 3 --loop
 ```
 
 实现：[`agent/paper_trail/collect.py`](../../agent/paper_trail/collect.py)。采集时会打印总会话进度、总轮次进度，以及每条完成后的目录路径；需要完整 JSON 时加 `--json`。网页人工对话同样会写 `llm_calls.json` 与 `dialogue_chain.json`。
@@ -61,4 +65,7 @@ uv run python -m run_paper_trail_collect --count 10 --max-turns 20 --seed 7 --co
 ```bash
 interface/.venv/bin/python dataset/paper_trail_data/check_personas.py
 interface/.venv/bin/python -m unittest paper_trail.checks.check_runtime
+interface/.venv/bin/python dataset/paper_trail_data/quality.py
 ```
+
+`quality.py` 会按 `prompt_version` 汇总开口长度、过长轮、复合句和背景泄露，结果写到 `data/paper_trail/collections/quality_report.json`。

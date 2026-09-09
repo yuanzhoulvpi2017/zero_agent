@@ -25,7 +25,7 @@ uv run python -m run_paper_trail
 | `/training` | 训练 | 规划中 | 提交训练、查看状态、导出权重 |
 | `/evaluation` | 评测 | 规划中 | 同一测试集对比商业 / 基座 / SFT |
 
-对话页右侧仍为工具调用。历史页只展示给用户看的回复；轨迹页读 `data/paper_trail/<session_id>/trajectory.json`。会话、缓存和模型都写在 `data/`，不提交 Git。新建对话不会删除旧记录。当前会话 ID 记在地址栏与浏览器本地存储中。
+对话页右侧仍为工具调用。历史页只展示给用户看的回复；轨迹页读 `data/paper_trail/web/<session_id>/trajectory.json`。会话、缓存和模型都写在 `data/`，不提交 Git。新建对话不会删除旧记录。当前会话 ID 记在地址栏与浏览器本地存储中。
 
 规划中的页面写明输入、输出和将提供的操作，不预建 `dataset/`、`training/`、`evaluation/` 空目录。实现时由对应阶段模块提供接口，界面只做展示与调用。
 

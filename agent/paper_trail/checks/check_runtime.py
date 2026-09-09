@@ -109,7 +109,7 @@ class Checks(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(view["messages"][-1]["usage"]["total_tokens"], 15)
         with tempfile.TemporaryDirectory() as directory:
             session_id = "b" * 32
-            path = Path(directory) / "data/paper_trail" / session_id
+            path = Path(directory) / "data/paper_trail/web" / session_id
             path.mkdir(parents=True)
             (path / "manifest.json").write_text(
                 json.dumps(

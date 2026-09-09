@@ -1,6 +1,6 @@
 # PaperTrail Agent
 
-小埋用 AgentScope 1.x 调用 DeepSeek（thinking 开启），通过只读 Hugging Face Papers 工具检索、阅读和比较论文。会话轨迹写入 `data/paper_trail/<session_id>/`，供界面回看和后续数据处理。该目录不提交 Git。
+小埋用 AgentScope 1.x 调用 DeepSeek（thinking 开启），通过只读 Hugging Face Papers 工具检索、阅读和比较论文。会话轨迹写入 `data/paper_trail/web/<session_id>/`，供界面回看和后续数据处理。该目录不提交 Git。
 
 ## 环境
 

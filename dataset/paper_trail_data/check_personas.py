@@ -43,9 +43,14 @@ class PersonaChecks(unittest.TestCase):
 
         persona = sample_persona(__import__("random").Random(5), max_turns=3)
         prompt = persona_system_prompt(persona)
-        # 新 prompt 版本改为“别一次讲全/不用复述”，测试随之更新
+        # 新 prompt 版本强调短聊、别复述、别连环铺垫
         self.assertIn("别一次讲全", prompt)
-        self.assertIn("不用复述出来", prompt)
+        self.assertIn("不要复述出来", prompt)
+        self.assertIn("禁止复述人设", prompt)
+        self.assertIn("连环铺垫", prompt)
+        self.assertIn("不要用 emoji", prompt)
+        self.assertIn("先别/先别管", prompt)
+        self.assertIn("markdown", prompt)
         self.assertIn(persona["goal"], prompt)
 
     def test_dialogue_chain_keeps_message_and_llm_sides(self):

@@ -219,7 +219,7 @@ class WebChecks(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            path = root / "data/paper_trail" / session_id
+            path = root / "data/paper_trail/web" / session_id
             path.mkdir(parents=True)
             (path / "manifest.json").write_text(
                 json.dumps(

@@ -619,7 +619,7 @@ summary { cursor: pointer; margin-top: 8px; }
           <div id="trace-list"></div>
         </div>
         <div class="browse-detail" id="trace-detail">
-          <p class="empty">选择一条轨迹，查看 thinking、工具调用和返回。文件位于 data/paper_trail/&lt;session_id&gt;/trajectory.json。</p>
+          <p class="empty">选择一条轨迹，查看 thinking、工具调用和返回。文件位于 data/paper_trail/web/&lt;session_id&gt;/trajectory.json。</p>
         </div>
       </div>
     </section>
@@ -641,7 +641,7 @@ summary { cursor: pointer; margin-top: 8px; }
           <article class="plan-card">
             <h3>输入</h3>
             <ul>
-              <li><code>data/paper_trail/&lt;session_id&gt;/trajectory.json</code></li>
+              <li><code>data/paper_trail/web/&lt;session_id&gt;/trajectory.json</code></li>
               <li><code>manifest.json</code> 中的模型、配置与用量</li>
             </ul>
           </article>
@@ -1254,7 +1254,7 @@ async function route() {
   if (page === "traces") {
     renderRecordList($("trace-list"), $("trace-search").value, id, next => go("/traces/" + next));
     if (id) await openTrace(id);
-    else $("trace-detail").innerHTML = '<p class="empty">选择一条轨迹，查看 thinking、工具调用和返回。文件位于 data/paper_trail/&lt;session_id&gt;/trajectory.json。</p>';
+    else $("trace-detail").innerHTML = '<p class="empty">选择一条轨迹，查看 thinking、工具调用和返回。文件位于 data/paper_trail/web/&lt;session_id&gt;/trajectory.json。</p>';
   }
 }
 function grow() {
