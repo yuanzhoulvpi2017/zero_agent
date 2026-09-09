@@ -1,0 +1,12 @@
+[project]
+name = "zero-agent-interface"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["zero-agent-business", "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "markdown-it-py>=3,<5"]
+
+[tool.uv.sources]
+zero-agent-business = { path = "../agent", editable = true }
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple/"
+default = true

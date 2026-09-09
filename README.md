@@ -30,7 +30,9 @@
 | [configs/](configs/README.md) | 按业务管理各阶段配置 |
 | [docs/](docs/README.md) | 业务导航、阶段教程与开发约定 |
 
-开始新业务时，请参照[业务开发指南](docs/README.md)。运行产物保存到 `artifacts/<业务名>/<实验编号>/`，不提交 Git。
+当前业务：[PaperTrail · 论文探索助手](docs/paper_trail/README.md)，基于 AgentScope、DeepSeek 与 Hugging Face Papers。设置 `DEEPSEEK_API_KEY` 后，在根目录执行 `uv run python -m run_paper_trail`，访问 http://127.0.0.1:8000 进行多轮对话。
+
+开始新业务时，请参照[业务开发指南](docs/README.md)。运行产物保存到 `data/<业务名>/`，模型和权重也放在这里，不提交 Git。
 
 ## 常见问题解答（FAQ）
 

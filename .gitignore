@@ -209,9 +209,30 @@ test_*
 
 .DS_Store
 
-# Local experiment outputs
+# Local experiment outputs. Never commit sessions, caches, datasets or reports.
+/data/
 /artifacts/
+
+# Model weights, even if saved outside data/
+*.pt
+*.pth
+*.bin
+*.onnx
+*.safetensors
+*.ckpt
+*.gguf
+*.ggml
+*.tflite
+*.h5
+*.joblib
+*.engine
+**/pytorch_model.bin
+**/model.safetensors
+**/tf_model.h5
+**/flax_model.msgpack
 
 # Local environment variants
 .env.*
 !.env.example
+
+hz_test*.md
