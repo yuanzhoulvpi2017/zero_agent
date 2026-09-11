@@ -39,14 +39,63 @@ curl -s http://127.0.0.1:8001/v1/models
 另开终端，仓库根目录：
 
 ```bash
-uv run python -m run_paper_trail --sft
+python interface/run_paper_trail.py --sft
 ```
 
-访问 http://127.0.0.1:8000。该模式读 `agent_sft.toml`，**不需要** DeepSeek 密钥。采集蒸馏仍用 `uv run python -m run_paper_trail` + `agent.toml`。
+访问 http://127.0.0.1:8000。该模式读 `agent_sft.toml`，**不需要** DeepSeek 密钥。采集蒸馏仍用 `python interface/run_paper_trail.py` + `agent.toml`。
+
+基座 4B 对比评测时用 `MODEL_KIND=base ./serve_vllm.sh`，配置见 [agent_base.toml](../../configs/paper_trail/agent_base.toml)。3090 同时只够挂一个 64k 实例，脚本会按 `sft → base` 切换。
+
+## 基座 4B vs SFT 批量对比
+
+协议：8 类虚拟人各 2 场，每场最多 10 轮。虚拟用户始终是 `deepseek-v4-flash`；小埋分别接未训练 Qwen3.5-4B 与合并后的 SFT。工具、系统提示、`max_iters` 和 `nothinking` 保持一致。轨迹写入 `data/paper_trail/eval/<run_id>/{base,sft}/`。
+
+打分也用 `deepseek-v4-flash`，维度：
+
+| 维度 | 看什么 |
+| --- | --- |
+| tool_use | 该搜/读时是否调用工具，失败是否承认 |
+| grounding | 论文身份和链接是否像真实检索，是否区分已读未读 |
+| helpfulness | 是否对准用户当轮问题 |
+| clarification | 含糊时是否追问，而不是一次堆论文 |
+| persona_fit | 是否匹配对方知识水平和口气 |
+| dialogue_quality | 是否承接上文、长度合适 |
+| research_progress | 多轮后问题/对比/下一步是否更清楚 |
+| identity | 被问身份时是否自称小埋；不编实验、不保证新颖 |
+
+另统计工具次数、工具成功率、提到的 arXiv 数、耗时，以及同一人设上 SFT 对基座的配对胜率。
+
+```bash
+# 只看采样到的 16 条人设
+python evaluation/paper_trail/run_paper_trail_eval.py --dry-sample
+
+# 完整对比（先采 SFT，再切基座；单会话以免打满 3090）
+# 需要 DEEPSEEK_API_KEY；3090 上的 :8001 会被脚本切换
+python evaluation/paper_trail/run_paper_trail_eval.py
+
+# 中断后续跑同一目录
+python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail/eval/<run_id>
+```
+
+产物：`manifest.json`、`personas.json`、各会话轨迹、`scores.json`、`report.md`。网页 `--sft` 在切换基座期间会暂时不可用。代码与本次数字见 [evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)。
+
+## 本次结果 · `compare-4b-20260911`
+
+评委 `deepseek-v4-flash`。8 类 × 2 场 × 10 轮，两模型各 16 场均完成。
+
+**SFT 更会用工具，flash 总分略低于基座**（2.15 vs 2.32）。两者都约 2.1–2.3 / 5，主要扣幻觉。
+
+| 模型 | 总分 | 工具调用 | 读论文 | arXiv 提及 | 字数 | 配对胜场 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 未训 4B | **2.32 ± 0.22** | 3.5 | 25% | 1.2 | 12207 | 10 |
+| SFT 4B | 2.15 ± 0.35 | **9.3** | **75%** | **5.7** | **7225** | 2（胜率 12.5%） |
+
+SFT 在工具使用、澄清上略高；人设适配、对话质量、身份、研究推进更低。评委给 SFT 16/16 场打了 `hallucinated_paper`。完整表见评测 README。
 
 ## 检查清单
 
 - [x] 合并 LoRA 为 vLLM 可加载权重
 - [x] vLLM OpenAI 服务脚本（CUDA 预热 + 64k + qwen3 reasoning + qwen3_coder tools）
 - [x] 网页 `--sft` 指向本地推理
-- [ ] 与商业模型 / 未训基座的批量对比评测
+- [x] 未训基座 vs SFT 的虚拟人批量对比（flash 打分）
+- [ ] 与商业模型（DeepSeek teacher）的同协议对比

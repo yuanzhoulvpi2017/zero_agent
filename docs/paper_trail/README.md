@@ -13,7 +13,7 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 - [x] 虚拟人采样与蒸馏采集入口（message + LLM 双端落盘，≤20 轮）。
 - [x] 轨迹 → SFT（`to_sft.py`，Qwen3.5 tools template + assistant-only mask）。
 - [x] TRL 双卡 QLoRA 完整 1 epoch（`max_length=16384`，见 [03_training.md](03_training.md)）。
-- [x] 本地 vLLM 部署合并后的 SFT（见 [04_evaluation.md](04_evaluation.md)）；批量对比评测待继续。
+- [x] 本地 vLLM 部署合并后的 SFT，以及未训 4B vs SFT 的虚拟人对比评测（见 [04_evaluation.md](04_evaluation.md)、[evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)）。
 
 代码：[Agent](../../agent/paper_trail/)、[界面](../../interface/paper_trail/)、[配置](../../configs/paper_trail/agent.toml)、[数据/蒸馏](../../dataset/paper_trail_data/)。
 
@@ -24,7 +24,7 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 ```bash
 # 已在 shell 中 export DEEPSEEK_API_KEY 时无需创建 .env。
 # 也可复制 configs/paper_trail/.env.example 为 .env 并填写。
-uv run python -m run_paper_trail
+python interface/run_paper_trail.py
 ```
 
 访问 http://127.0.0.1:8000。左侧是采集 / 数据 / 训练 / 评测子页面：当前可直接对话、查看历史对话和轨迹。示例问题：“我想了解最近 Agent 长期记忆方向，先帮我梳理几个分支。”每轮写入 `data/paper_trail/web/<session_id>/`，新建对话不会覆盖旧记录。`data/` 与模型文件不提交 Git。
@@ -34,14 +34,21 @@ uv run python -m run_paper_trail
 ```bash
 cd evaluation/paper_trail && CUDA_VISIBLE_DEVICES=0 ./serve_vllm.sh
 # 另开终端
-uv run python -m run_paper_trail --sft
+python interface/run_paper_trail.py --sft
 ```
 
 蒸馏采集（虚拟人，默认 flash、少量轮次；写入 `data/paper_trail/constructed/constructed__<persona>__<session_id>/`）：
 
 ```bash
-uv run python -m run_paper_trail_collect --dry-sample --count 1
-uv run python -m run_paper_trail_collect --count 1 --max-turns 3
+python interface/run_paper_trail_collect.py --dry-sample --count 1
+python interface/run_paper_trail_collect.py --count 1 --max-turns 3
+```
+
+4B 基座 vs SFT 对比评测（8 类人设 × 2 场 × 最多 10 轮，flash 打分）：
+
+```bash
+python evaluation/paper_trail/run_paper_trail_eval.py --dry-sample
+python evaluation/paper_trail/run_paper_trail_eval.py
 ```
 
 界面环境通过本地可编辑依赖安装 `agent/` 包，调用其公开的会话接口。仅开发后端时可运行 `uv sync --project agent`。根目录教程环境不受影响。

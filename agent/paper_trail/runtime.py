@@ -499,9 +499,11 @@ def agent_config_path() -> Path:
     return ROOT / "configs" / "paper_trail" / "agent.toml"
 
 
-def settings():
+def load_settings(path: Path | None = None):
     load_dotenv(ROOT / "configs/paper_trail/.env", override=False)
-    path = agent_config_path()
+    path = Path(path) if path is not None else agent_config_path()
+    if not path.is_absolute():
+        path = ROOT / path
     if not path.is_file():
         raise ValueError(f"找不到 Agent 配置：{path}")
     config = tomllib.loads(path.read_text())
@@ -514,6 +516,15 @@ def settings():
                 f"请设置 {api_key_env}，或填写 configs/paper_trail/.env。"
             )
     return config
+
+
+def settings():
+    return load_settings()
+
+
+def user_llm_settings():
+    """Virtual-user / judge side: always DeepSeek flash in agent.toml."""
+    return load_settings(ROOT / "configs" / "paper_trail" / "agent.toml")
 
 
 def _model_kwargs(config: dict) -> dict:
@@ -794,11 +805,16 @@ Daily Papers 是社区精选，不能宣称覆盖全部最新论文；区分论�
                 )
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as exc:
+                message = str(exc) or exc.__class__.__name__
+                for variable in ("DEEPSEEK_API_KEY", "LLM_API_KEY", "HF_TOKEN"):
+                    secret = os.getenv(variable)
+                    if secret:
+                        message = message.replace(secret, "[REDACTED]")
                 emit(
                     {
                         "type": "error",
-                        "message": "模型调用失败，请检查网络、密钥与模型权限后重试。",
+                        "message": f"模型调用失败：{message}",
                     }
                 )
 

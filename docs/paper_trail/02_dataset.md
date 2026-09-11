@@ -15,7 +15,7 @@
 只看采样、不花额度：
 
 ```bash
-uv run python -m run_paper_trail_collect --dry-sample --count 8 --seed 7
+python interface/run_paper_trail_collect.py --dry-sample --count 8 --seed 7
 ```
 
 ## 落盘内容（两边都记）
@@ -43,19 +43,19 @@ uv run python -m run_paper_trail_collect --dry-sample --count 8 --seed 7
 
 ```bash
 # 先 dry-sample 确认角色
-uv run python -m run_paper_trail_collect --dry-sample --count 1 --max-turns 3
+python interface/run_paper_trail_collect.py --dry-sample --count 1 --max-turns 3
 
 # 真正调用模型（会消耗额度；终端有会话/轮次进度条）
-uv run python -m run_paper_trail_collect --count 1 --max-turns 3 --seed 7
+python interface/run_paper_trail_collect.py --count 1 --max-turns 3 --seed 7
 
 # 大批量示例
-uv run python -m run_paper_trail_collect --count 10 --max-turns 20 --seed 7
+python interface/run_paper_trail_collect.py --count 10 --max-turns 20 --seed 7
 
 # 更快一点：并行 3 条
-uv run python -m run_paper_trail_collect --count 10 --max-turns 20 --seed 7 --concurrency 3
+python interface/run_paper_trail_collect.py --count 10 --max-turns 20 --seed 7 --concurrency 3
 
 # 持续构造到额度不够自动停
-uv run python -m run_paper_trail_collect --count 8 --max-turns 12 --seed 101 --concurrency 3 --loop
+python interface/run_paper_trail_collect.py --count 8 --max-turns 12 --seed 101 --concurrency 3 --loop
 ```
 
 实现：[`agent/paper_trail/collect.py`](../../agent/paper_trail/collect.py)。采集时会打印总会话进度、总轮次进度，以及每条完成后的目录路径；需要完整 JSON 时加 `--json`。网页人工对话同样会写 `llm_calls.json` 与 `dialogue_chain.json`。

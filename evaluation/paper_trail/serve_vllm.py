@@ -1,4 +1,4 @@
-"""Launch vLLM OpenAI server for the merged PaperTrail SFT checkpoint."""
+"""Launch vLLM OpenAI server for PaperTrail SFT or base Qwen3.5-4B."""
 
 from __future__ import annotations
 
@@ -38,31 +38,43 @@ def main() -> int:
     from vllm.entrypoints.cli.main import main as vllm_main
 
     root = repo_root()
-    merged = Path(
-        os.environ.get(
-            "MERGED",
-            str(
-                root
-                / "data"
-                / "paper_trail"
-                / "models"
-                / "qwen35-4b-sft-qlora-16k"
-                / "merged"
-            ),
+    kind = os.environ.get("MODEL_KIND", "sft").strip().lower()
+    if os.environ.get("MODEL"):
+        model_path = Path(os.environ["MODEL"])
+        default_name = os.environ.get("SERVED_MODEL_NAME") or model_path.name
+    elif kind in {"base", "base-4b", "qwen"}:
+        model_path = root / "model" / "Qwen" / "Qwen3.5-4B"
+        default_name = "paper-trail-base"
+    else:
+        model_path = Path(
+            os.environ.get(
+                "MERGED",
+                str(
+                    root
+                    / "data"
+                    / "paper_trail"
+                    / "models"
+                    / "qwen35-4b-sft-qlora-16k"
+                    / "merged"
+                ),
+            )
         )
-    )
-    if not merged.is_dir():
-        raise SystemExit(
-            f"missing merged checkpoint: {merged}\n"
+        default_name = "paper-trail-sft"
+    if not model_path.is_dir():
+        hint = (
             "run: cd training/paper_trail && uv run python merge_lora.py"
+            if kind not in {"base", "base-4b", "qwen"} and not os.environ.get("MODEL")
+            else f"missing model directory: {model_path}"
         )
+        raise SystemExit(f"missing checkpoint: {model_path}\n{hint}")
+    print(f"serve kind={kind} model={model_path}", flush=True)
 
     sys.argv = [
         "vllm",
         "serve",
-        str(merged),
+        str(model_path),
         "--served-model-name",
-        os.environ.get("SERVED_MODEL_NAME", "paper-trail-sft"),
+        os.environ.get("SERVED_MODEL_NAME", default_name),
         "--host",
         os.environ.get("HOST", "127.0.0.1"),
         "--port",

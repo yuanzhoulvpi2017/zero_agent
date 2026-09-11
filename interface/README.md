@@ -7,3 +7,5 @@
 界面负责展示、交互状态和后端调用适配，通过明确接口调用 `agent/`、`dataset/`、`training/`、`evaluation/` 的能力。核心业务逻辑保留在对应模块，模型推理服务和评测计算保留在 `evaluation/`。各阶段可以独立运行脚本、批处理和服务接口。
 
 根据界面技术栈独立管理依赖和锁文件，不提前限定框架。业务配置放在 `configs/<业务名>/`；界面启动方式、依赖的后端服务和接口约定记录在 `docs/<业务名>/05_interface.md`，并从业务 README 链接。
+
+PaperTrail 网页入口：[`run_paper_trail.py`](run_paper_trail.py)；蒸馏采集：[`run_paper_trail_collect.py`](run_paper_trail_collect.py)。从仓库根目录执行 `python interface/run_paper_trail.py`。

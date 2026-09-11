@@ -10,6 +10,7 @@ import os
 import sys
 import time
 from collections.abc import Callable
+from pathlib import Path
 from uuid import uuid4
 
 import openai
@@ -25,6 +26,7 @@ from paper_trail.runtime import (
     constructed_root,
     data_root,
     settings,
+    user_llm_settings,
 )
 
 DATASET = ROOT / "dataset"
@@ -80,14 +82,15 @@ def utterance_needs_retry(text: str) -> bool:
 class VirtualUser:
     """Cheap flash-side user that speaks like a sampled persona."""
 
-    def __init__(self, config: dict, persona: dict):
-        self.config = config
+    def __init__(self, config: dict, persona: dict, user_config: dict | None = None):
+        # Agent `config` may point at local vLLM; the simulated user stays on flash.
+        self.config = user_config or user_llm_settings()
         self.persona = persona
         self.system = personas_mod.persona_system_prompt(persona)
         self.client = openai.AsyncOpenAI(
             api_key=os.environ["DEEPSEEK_API_KEY"],
-            base_url=config["base_url"],
-            timeout=min(60, int(config.get("request_timeout", 180))),
+            base_url=self.config["base_url"],
+            timeout=min(60, int(self.config.get("request_timeout", 180))),
             max_retries=1,
         )
         self.calls = []
@@ -192,6 +195,9 @@ async def collect_one(
     config: dict | None = None,
     cache: ResponseCache | None = None,
     on_turn_done: Callable[[dict, int, str], None] | None = None,
+    directory_root: Path | None = None,
+    user_config: dict | None = None,
+    extra_manifest: dict | None = None,
 ) -> dict:
     config = config or settings()
     cache = cache or ResponseCache(data_root() / "cache")
@@ -201,10 +207,14 @@ async def collect_one(
         moves.append("narrow")
     persona = {**persona, "jump_plan": moves, "max_turns": turns}
     session_id = uuid4().hex
-    directory = constructed_root() / constructed_dirname(persona["id"], session_id)
+    root = Path(directory_root) if directory_root is not None else constructed_root()
+    directory = root / constructed_dirname(persona["id"], session_id)
     session = PaperSession(config, cache, session_id=session_id, directory=directory)
+    if extra_manifest:
+        session.manifest.update(extra_manifest)
+        session.save_json("manifest.json", session.manifest)
     session.attach_persona(persona, moves)
-    user = VirtualUser(config, persona)
+    user = VirtualUser(config, persona, user_config=user_config)
     assistant_text = ""
     try:
         for index, move in enumerate(moves, start=1):
@@ -231,7 +241,7 @@ async def collect_one(
         return {
             "session_id": session.id,
             "directory": str(session.directory),
-            "storage_kind": "constructed",
+            "storage_kind": (extra_manifest or {}).get("storage_kind") or "constructed",
             "persona_id": persona["id"],
             "prompt_version": persona.get("prompt_version")
             or personas_mod.VIRTUAL_USER_PROMPT_VERSION,
