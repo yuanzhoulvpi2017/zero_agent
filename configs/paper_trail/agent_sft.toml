@@ -1,0 +1,14 @@
+# Local vLLM SFT (merged Qwen3.5-4B LoRA). Teacher collection still uses agent.toml.
+provider = "openai"
+model = "paper-trail-sft"
+base_url = "http://127.0.0.1:8001/v1"
+api_key_env = "LLM_API_KEY"
+api_key_optional = true
+api_key_default = "EMPTY"
+thinking = false
+enable_thinking = false
+max_tokens = 4096
+max_iters = 10
+request_timeout = 300
+cache_feed_ttl = 900
+cache_paper_ttl = 86400

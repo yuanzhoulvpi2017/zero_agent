@@ -1,0 +1,9 @@
+model = "deepseek-v4-flash"
+base_url = "https://api.deepseek.com"
+thinking = true
+reasoning_effort = "high"
+max_tokens = 16384
+max_iters = 10
+request_timeout = 180
+cache_feed_ttl = 900
+cache_paper_ttl = 86400

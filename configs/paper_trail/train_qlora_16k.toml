@@ -1,0 +1,53 @@
+# Dual-GPU QLoRA SFT (RTX 3090 24GB + RTX 3060 12GB), layer-split (not DDP).
+# Probed: 20480 OK on long-sample smoke but full-set died at step 8 (Triton CUDA OOM).
+# Default 16384 for full-epoch headroom; override with --max-length to probe higher.
+# Data max≈42k / p50≈26k without thinking — sequences longer than max_length are truncated.
+
+[model]
+path = "model/Qwen/Qwen3.5-4B"
+
+[data]
+train_jsonl = "data/paper_trail/datasets/sft/train.jsonl"
+
+[train]
+output_dir = "data/paper_trail/models/qwen35-4b-sft-qlora-16k"
+num_train_epochs = 1.0
+max_steps = 0
+per_device_train_batch_size = 1
+gradient_accumulation_steps = 8
+learning_rate = 2.0e-4
+logging_steps = 5
+save_steps = 50
+save_total_limit = 3
+bf16 = true
+max_length = 16384
+gradient_checkpointing = true
+warmup_steps = 50
+lr_scheduler_type = "cosine"
+seed = 7
+# Explicit map: full-attn on 3090; linear layers 28-30 on 3060.
+multi_gpu = true
+device_map = "auto"
+num_layers = 32
+max_memory = { 0 = "20GiB", 1 = "8GiB", cpu = "80GiB" }
+report_to = []
+
+[quantization]
+load_in_4bit = true
+double_quant = true
+quant_type = "nf4"
+
+[lora]
+enabled = true
+r = 16
+alpha = 32
+dropout = 0.05
+target_modules = [
+  "q_proj",
+  "k_proj",
+  "v_proj",
+  "o_proj",
+  "gate_proj",
+  "up_proj",
+  "down_proj",
+]

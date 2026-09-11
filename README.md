@@ -16,6 +16,24 @@
 
 
 
+## 实战开发目录
+
+实战代码按阶段组织，每个阶段内部按业务划分，业务名称保持一致。现有基础教程与示例保留在当前目录。
+
+| 目录 | 用途 |
+| --- | --- |
+| [agent/](agent/README.md) | Agent 开发、自定义工具、轨迹采集 |
+| [dataset/](dataset/README.md) | 轨迹清洗、过滤、标注与 SFT 数据生成 |
+| [training/](training/README.md) | 模型训练与导出 |
+| [evaluation/](evaluation/README.md) | 推理、评测与效果对比 |
+| [interface/](interface/README.md) | 统一用户交互界面，按业务组织 |
+| [configs/](configs/README.md) | 按业务管理各阶段配置 |
+| [docs/](docs/README.md) | 业务导航、阶段教程与开发约定 |
+
+当前业务：[PaperTrail · 论文探索助手](docs/paper_trail/README.md)，基于 AgentScope、DeepSeek 与 Hugging Face Papers。设置 `DEEPSEEK_API_KEY` 后，在根目录执行 `uv run python -m run_paper_trail`，访问 http://127.0.0.1:8000 进行多轮对话。
+
+开始新业务时，请参照[业务开发指南](docs/README.md)。运行产物保存到 `data/<业务名>/`，模型和权重也放在这里，不提交 Git。
+
 ## 常见问题解答（FAQ）
 
 ### 当前 Agent 开发是否有必要使用现有框架？
