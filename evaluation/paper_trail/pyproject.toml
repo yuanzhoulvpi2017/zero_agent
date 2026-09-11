@@ -1,0 +1,15 @@
+[project]
+name = "paper-trail-evaluation"
+version = "0.1.0"
+description = "PaperTrail local inference (vLLM) and evaluation"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "vllm>=0.14.0",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true

@@ -11,8 +11,9 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 - [x] HF 成功响应的磁盘缓存与进程内同请求合并。
 - [x] 本地多轮流式聊天网页、实时状态、会话轨迹，以及可回看、可继续的对话记录。
 - [x] 虚拟人采样与蒸馏采集入口（message + LLM 双端落盘，≤20 轮）。
-- [ ] 轨迹过滤、人工标注、SFT 数据生成。
-- [ ] 模型训练与独立测试集评测。
+- [x] 轨迹 → SFT（`to_sft.py`，Qwen3.5 tools template + assistant-only mask）。
+- [x] TRL 双卡 QLoRA 完整 1 epoch（`max_length=16384`，见 [03_training.md](03_training.md)）。
+- [x] 本地 vLLM 部署合并后的 SFT（见 [04_evaluation.md](04_evaluation.md)）；批量对比评测待继续。
 
 代码：[Agent](../../agent/paper_trail/)、[界面](../../interface/paper_trail/)、[配置](../../configs/paper_trail/agent.toml)、[数据/蒸馏](../../dataset/paper_trail_data/)。
 
@@ -28,6 +29,14 @@ uv run python -m run_paper_trail
 
 访问 http://127.0.0.1:8000。左侧是采集 / 数据 / 训练 / 评测子页面：当前可直接对话、查看历史对话和轨迹。示例问题：“我想了解最近 Agent 长期记忆方向，先帮我梳理几个分支。”每轮写入 `data/paper_trail/web/<session_id>/`，新建对话不会覆盖旧记录。`data/` 与模型文件不提交 Git。
 
+本地 SFT（先起 vLLM，再开网页）：
+
+```bash
+cd evaluation/paper_trail && CUDA_VISIBLE_DEVICES=0 ./serve_vllm.sh
+# 另开终端
+uv run python -m run_paper_trail --sft
+```
+
 蒸馏采集（虚拟人，默认 flash、少量轮次；写入 `data/paper_trail/constructed/constructed__<persona>__<session_id>/`）：
 
 ```bash
@@ -37,4 +46,4 @@ uv run python -m run_paper_trail_collect --count 1 --max-turns 3
 
 界面环境通过本地可编辑依赖安装 `agent/` 包，调用其公开的会话接口。仅开发后端时可运行 `uv sync --project agent`。根目录教程环境不受影响。
 
-详细说明：[Agent 与工具](01_agent.md)、[数据与蒸馏](02_dataset.md)、[界面](05_interface.md)。
+详细说明：[Agent 与工具](01_agent.md)、[数据与蒸馏](02_dataset.md)、[训练](03_training.md)、[评测与 vLLM](04_evaluation.md)、[界面](05_interface.md)。

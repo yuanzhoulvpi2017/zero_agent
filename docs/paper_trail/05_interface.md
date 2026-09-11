@@ -10,6 +10,9 @@
 # 已 export DEEPSEEK_API_KEY 时可跳过 .env
 # 否则复制 configs/paper_trail/.env.example 为 .env 并填写
 uv run python -m run_paper_trail
+
+# 本地 SFT（需先启动 evaluation/paper_trail/serve_vllm.sh）
+uv run python -m run_paper_trail --sft
 ```
 
 访问 http://127.0.0.1:8000。界面使用 `interface/` 的虚拟环境，通过可编辑依赖安装 `agent/` 包。请使用单个 worker，以便进程内会话与缓存合并生效。

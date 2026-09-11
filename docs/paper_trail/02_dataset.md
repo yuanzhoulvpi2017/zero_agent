@@ -69,3 +69,18 @@ interface/.venv/bin/python dataset/paper_trail_data/quality.py
 ```
 
 `quality.py` 会按 `prompt_version` 汇总开口长度、过长轮、复合句和背景泄露，结果写到 `data/paper_trail/collections/quality_report.json`。
+
+## 转 SFT
+
+把 `llm_calls.json` 转成 Qwen3.5 可用的对话样本（含 tools schema；**默认去掉 teacher thinking**）：
+
+```bash
+# 默认：去 thinking / reason / reasoning_content；按 64k token 预算智能压缩（先压旧 tool，再丢旧轮，不切最终 assistant）
+cd training/paper_trail && uv run python ../../dataset/paper_trail_data/to_sft.py \
+  --max-tokens 65536 \
+  --model ../../model/Qwen/Qwen3.5-4B
+
+interface/.venv/bin/python dataset/paper_trail_data/check_to_sft.py
+```
+
+输出：`data/paper_trail/datasets/sft/train.jsonl`。训练见 [03_training.md](03_training.md)。

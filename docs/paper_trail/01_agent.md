@@ -12,7 +12,7 @@ cp configs/paper_trail/.env.example configs/paper_trail/.env
 uv sync --project agent --directory agent
 ```
 
-配置见 [configs/paper_trail/agent.toml](../../configs/paper_trail/agent.toml)：当前模型为 `deepseek-v4-flash`，以及 base URL、thinking、max_tokens、工具迭代次数、请求超时和检索/论文缓存 TTL。网页对话和后续蒸馏都读这份配置，不再使用 pro。
+配置见 [configs/paper_trail/agent.toml](../../configs/paper_trail/agent.toml)：当前教师模型为 `deepseek-v4-flash`。本地 SFT 推理改用 [agent_sft.toml](../../configs/paper_trail/agent_sft.toml)，通过环境变量 `PAPER_TRAIL_AGENT_CONFIG` 或 `uv run python -m run_paper_trail --sft` 切换。
 
 ## 代码
 

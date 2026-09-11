@@ -236,3 +236,4 @@ test_*
 !.env.example
 
 hz_test*.md
+model
