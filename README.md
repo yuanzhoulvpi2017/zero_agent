@@ -73,7 +73,7 @@ Agent 名叫「小埋」，由 B站 UP主「良睦路程序员」创建。目录
 | 采集 | 8 类虚拟人（硕/博/老师/工程师/综述/转行/独立/组会质疑），开口短、含糊，像微信。最多 20 轮。 | [interface/run_paper_trail_collect.py](interface/run_paper_trail_collect.py)、[02_dataset.md](docs/paper_trail/02_dataset.md) |
 | 数据 | `llm_calls` → Qwen3.5 SFT jsonl；超长先压旧 tool 再丢旧轮，不切开最后一句 assistant。 | [dataset/paper_trail_data/to_sft.py](dataset/paper_trail_data/to_sft.py) |
 | 训练 | TRL QLoRA，3090+3060 按层拆卡，默认 16k。不要设 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`。合并后再给 vLLM，不要 `--enable-lora`。 | [03_training.md](docs/paper_trail/03_training.md) |
-| 评测 | 8 类 × 2 场 × 10 轮；虚拟用户始终 flash。4B 当场采集，教师复用蒸馏轨迹只评前 10 轮。总分三维：依据、有用、对话。工具次数、论文号依据率、身份命中不进总分。 | [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md) |
+| 评测 | 8 类 × 2 场 × 10 轮；虚拟用户始终 flash。4B 当场采集，教师复用蒸馏轨迹只评前 10 轮。总分三维：依据、有用、对话。工具行为、明确 ID 核验、输出长度和身份场景分开诊断，不进总分。 | [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md) |
 
 #### 怎么跑
 
@@ -109,7 +109,7 @@ python evaluation/paper_trail/run_paper_trail_eval.py \
 
 - Agent、网页、虚拟人采集、SFT 转换、QLoRA 1 epoch、vLLM 部署、教师 / 基座 / SFT 同协议对比均已跑通。
 - 教师对话走 `configs/paper_trail/agent.toml`；本地 SFT 走 `agent_sft.toml`（`http://127.0.0.1:8001/v1`，模型名 `paper-trail-sft`）。
-- 一次对比（`compare-4b-20260911`，flash 评委，各 16 场；总分三维：依据 / 有用 / 对话）：教师 **4.69**，SFT **2.06**，未训 4B **1.90**。SFT 更会查，依据高于基座；对话仍略差。论文号依据率 74% / 88% / 100%。细节表见 [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md)。
+- 一次对比（`compare-4b-20260911`，flash 评委，各 16 场；总分三维：依据 / 有用 / 对话）：教师 **4.69**，SFT **2.06**，未训 4B **1.90**。SFT 主要学到了更常查和读，尚未学稳工具外不补细节与对话收敛；6 胜、3 负、7 平，只算本批样本轻微领先。教师与评委同为 flash，教师分数可能有同模型风格偏好。完整解释见 [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md)。
 
 分阶段教程：[业务总览](docs/paper_trail/README.md) · [Agent](docs/paper_trail/01_agent.md) · [数据](docs/paper_trail/02_dataset.md) · [训练](docs/paper_trail/03_training.md) · [评测](docs/paper_trail/04_evaluation.md) · [界面](docs/paper_trail/05_interface.md)。
 

@@ -12,6 +12,7 @@ from scoring import (
     automatic_metrics,
     compact_session,
     papers_from_payload,
+    summarize_scores,
 )
 
 
@@ -121,6 +122,58 @@ class ScoringChecks(unittest.TestCase):
             self.assertEqual(metrics["arxiv_grounded"], 1)
             self.assertEqual(metrics["arxiv_ungrounded"], 1)
             self.assertEqual(metrics["ungrounded_arxiv_ids"], ["2602.00001"])
+
+    def test_summary_uses_micro_average_for_id_support(self):
+        rows = []
+        for index, automatic in enumerate(
+            (
+                {
+                    "completed": True,
+                    "turns": 1,
+                    "tool_calls": 1,
+                    "tool_ok": 1,
+                    "tool_err": 0,
+                    "used_search": True,
+                    "used_read": False,
+                    "arxiv_mentions": 10,
+                    "arxiv_grounded": 10,
+                    "arxiv_ungrounded": 0,
+                    "assistant_chars": 100,
+                    "turn_complete_rate": 1.0,
+                    "identity_asked": False,
+                },
+                {
+                    "completed": True,
+                    "turns": 1,
+                    "tool_calls": 1,
+                    "tool_ok": 0,
+                    "tool_err": 1,
+                    "used_search": False,
+                    "used_read": True,
+                    "arxiv_mentions": 1,
+                    "arxiv_grounded": 0,
+                    "arxiv_ungrounded": 1,
+                    "assistant_chars": 300,
+                    "turn_complete_rate": 1.0,
+                    "identity_asked": False,
+                },
+            )
+        ):
+            rows.append(
+                {
+                    "model_tag": "sft",
+                    "persona_id": f"p{index}",
+                    "category": "test",
+                    "overall": 3.0,
+                    "scores": {key: 3 for key in DIMENSIONS},
+                    "flags": [],
+                    "automatic": automatic,
+                }
+            )
+        auto = summarize_scores(rows)["models"]["sft"]["automatic"]
+        self.assertEqual(auto["arxiv_grounded_rate"], round(10 / 11, 3))
+        self.assertEqual(auto["tool_success_rate"], 0.5)
+        self.assertEqual(auto["assistant_chars_per_turn"], 200.0)
 
 
 if __name__ == "__main__":

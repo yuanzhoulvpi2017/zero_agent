@@ -465,18 +465,7 @@ def summarize_scores(rows: list[dict]) -> dict:
                 "mean": round(mean(values), 3),
                 "std": round(pstdev(values), 3) if len(values) > 1 else 0.0,
             }
-        auto_keys = (
-            "turns",
-            "tool_calls",
-            "tool_ok_rate",
-            "arxiv_mentions",
-            "arxiv_grounded",
-            "arxiv_ungrounded",
-            "arxiv_grounded_rate",
-            "assistant_chars",
-            "elapsed_seconds",
-            "turn_complete_rate",
-        )
+        auto_keys = ("turns", "tool_calls", "assistant_chars", "turn_complete_rate")
         automatic = {}
         for key in auto_keys:
             values = [
@@ -486,6 +475,44 @@ def summarize_scores(rows: list[dict]) -> dict:
             ]
             if values:
                 automatic[key] = round(mean(values), 3)
+        autos = [item.get("automatic") or {} for item in items]
+        tool_ok = sum(int(item.get("tool_ok") or 0) for item in autos)
+        tool_err = sum(int(item.get("tool_err") or 0) for item in autos)
+        tool_results = tool_ok + tool_err
+        arxiv_mentions = sum(int(item.get("arxiv_mentions") or 0) for item in autos)
+        arxiv_grounded = sum(int(item.get("arxiv_grounded") or 0) for item in autos)
+        arxiv_ungrounded = sum(int(item.get("arxiv_ungrounded") or 0) for item in autos)
+        total_turns = sum(int(item.get("turns") or 0) for item in autos)
+        total_chars = sum(int(item.get("assistant_chars") or 0) for item in autos)
+        automatic.update(
+            {
+                "tool_ok": tool_ok,
+                "tool_err": tool_err,
+                "tool_success_rate": (
+                    round(tool_ok / tool_results, 3) if tool_results else None
+                ),
+                "used_search_sessions": sum(
+                    1 for item in autos if item.get("used_search")
+                ),
+                "used_read_sessions": sum(
+                    1 for item in autos if item.get("used_read")
+                ),
+                "arxiv_mentions_total": arxiv_mentions,
+                "arxiv_grounded_total": arxiv_grounded,
+                "arxiv_ungrounded_total": arxiv_ungrounded,
+                # Micro-average over every explicit arXiv ID mention. Sessions that
+                # mention no ID add no evidence either way instead of being skipped
+                # by a misleading macro-average.
+                "arxiv_grounded_rate": (
+                    round(arxiv_grounded / arxiv_mentions, 3)
+                    if arxiv_mentions
+                    else None
+                ),
+                "assistant_chars_per_turn": (
+                    round(total_chars / total_turns, 3) if total_turns else None
+                ),
+            }
+        )
         completed = sum(1 for item in items if (item.get("automatic") or {}).get("completed"))
         flag_counts = Counter()
         for item in items:
@@ -500,6 +527,9 @@ def summarize_scores(rows: list[dict]) -> dict:
             for item in items
             if (item.get("automatic") or {}).get("identity_asked")
         ]
+        identity_hits = sum(
+            1 for item in identity if item["automatic"].get("identity_hit")
+        )
         categories = {}
         for item in items:
             cat = item.get("category") or "unknown"
@@ -514,14 +544,10 @@ def summarize_scores(rows: list[dict]) -> dict:
             "flag_counts": dict(flag_counts),
             "sessions_with_ungrounded_arxiv": sessions_ungrounded,
             "judge_hallucinated_paper": flag_counts.get("hallucinated_paper", 0),
+            "identity_asked": len(identity),
+            "identity_hits": identity_hits,
             "identity_hit_rate": (
-                round(
-                    mean(
-                        1.0 if item["automatic"].get("identity_hit") else 0.0
-                        for item in identity
-                    ),
-                    3,
-                )
+                round(identity_hits / len(identity), 3)
                 if identity
                 else None
             ),
@@ -593,6 +619,21 @@ def render_report(payload: dict) -> str:
         )
     lines.extend(
         [
+            "## 读表须知",
+            "",
+            "- 总分只平均「依据 / 有用 / 对话」三个评委分数（1–5）；后续诊断项一律不进总分。",
+            "- 每个模型只有 16 场，本结果用于定位问题，不作为稳定排行榜。",
+            "- 教师与 4B 只对齐角色类别、轮数和评委，不是相同用户逐句配对；只对基座/SFT 计算配对胜负。",
+            "- 工具调用多不代表更好；工具成功只表示接口返回 `ok=true`，不表示答案正确。",
+            "- 明确 ID 支持率只核验回复里写出的 arXiv ID，不能证明标题、作者、数字和仓库正确。",
+            "- 幻觉/倾泻/该查未查是评委告警，不是自动事实；必须结合 ID 核验和原轨迹看。",
+            "- 教师耗时来自 10–12 轮旧轨迹，无法与 4B 的 10 轮实测公平比较，因此不报告耗时排名。",
+            "- 教师和评委都是 `deepseek-v4-flash`，可能存在同模型风格偏好；教师分数不是独立评委下的绝对值。",
+            "",
+        ]
+    )
+    lines.extend(
+        [
             "## 总分",
             "",
             "| 模型 | n | 完成 | 总分均值 | 标准差 |",
@@ -623,6 +664,37 @@ def render_report(payload: dict) -> str:
         if "base" in values and "sft" in values:
             cells.append(f"{values['sft'] - values['base']:+.3f}")
         lines.append("| " + " | ".join(cells) + " |")
+    if {"teacher", "base", "sft"} <= set(models):
+        teacher = models["teacher"]
+        base = models["base"]
+        sft = models["sft"]
+        teacher_auto = teacher.get("automatic") or {}
+        base_auto = base.get("automatic") or {}
+        sft_auto = sft.get("automatic") or {}
+        lines.extend(
+            [
+                "",
+                "## 本次分差怎么来的",
+                "",
+                f"- 教师的 {teacher_auto.get('arxiv_grounded_total', 0)} 个明确 ID 全部在工具结果中，"
+                f"工具结果成功率 {teacher_auto.get('tool_success_rate', 0):.1%}；"
+                "它经常在读取失败时承认限制，并按用户要求收短。"
+                "但教师由同一个 flash 评审，分数可能有同模型风格偏好。",
+                f"- SFT 的依据分高于基座（"
+                f"{sft['dimensions']['grounding']['mean']:.3f} vs "
+                f"{base['dimensions']['grounding']['mean']:.3f}），主要因为更常调用工具和阅读论文；"
+                f"这不等于事实更准：明确 ID 支持率为 "
+                f"{sft_auto.get('arxiv_grounded_rate', 0):.1%} vs "
+                f"{base_auto.get('arxiv_grounded_rate', 0):.1%}。",
+                f"- 幻觉论文告警：SFT "
+                f"{sft.get('judge_hallucinated_paper', 0)}/{sft['n']}、基座 "
+                f"{base.get('judge_hallucinated_paper', 0)}/{base['n']}；"
+                f"SFT 的倾泻清单告警为 "
+                f"{(sft.get('flag_counts') or {}).get('dump_list', 0)}/{sft['n']}。"
+                "确定学到的是工具行为，尚未学稳的是工具外不补细节和对话收敛。",
+                "",
+            ]
+        )
     if pairwise.get("n"):
         lines.extend(
             [
@@ -636,52 +708,114 @@ def render_report(payload: dict) -> str:
                 "",
             ]
         )
-    lines.extend(["", "## 自动指标均值", ""])
+    lines.extend(
+        [
+            "",
+            "## 工具行为（描述性，不进总分）",
+            "",
+            "工具更多不等于质量更好；这里仅说明模型是否形成检索/阅读行为。",
+            "",
+        ]
+    )
     lines.append("| 指标 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |")
     lines.append("| --- | " + " | ".join("---" for _ in present) + " |")
-    auto_keys = (
-        "turns",
-        "tool_calls",
-        "tool_ok_rate",
-        "arxiv_mentions",
-        "arxiv_grounded",
-        "arxiv_ungrounded",
-        "arxiv_grounded_rate",
-        "assistant_chars",
-        "elapsed_seconds",
-        "turn_complete_rate",
+    behavior_rows = (
+        ("tool_calls", "工具调用 / 场", "mean"),
+        ("used_search_sessions", "使用过搜索的场次", "fraction"),
+        ("used_read_sessions", "使用过读论文的场次", "fraction"),
+        ("tool_success_rate", "工具结果成功率（微平均）", "percent"),
     )
-    labels = {
-        "turns": "完成轮数",
-        "tool_calls": "工具调用次数",
-        "tool_ok_rate": "工具成功比例",
-        "arxiv_mentions": "提到的 arXiv 数",
-        "arxiv_grounded": "回复论文号在工具内",
-        "arxiv_ungrounded": "回复论文号在工具外",
-        "arxiv_grounded_rate": "论文号依据率",
-        "assistant_chars": "助手字数",
-        "elapsed_seconds": "耗时（秒）",
-        "turn_complete_rate": "轮次完成率",
-    }
-    for key in auto_keys:
-        row = [labels[key]]
+    for key, label, kind in behavior_rows:
+        row = [label]
         for tag in present:
-            value = (models[tag].get("automatic") or {}).get(key)
-            row.append("—" if value is None else f"{value:.3f}")
+            item = models[tag]
+            value = (item.get("automatic") or {}).get(key)
+            if value is None:
+                cell = "—"
+            elif kind == "fraction":
+                cell = f"{int(value)}/{item['n']} ({value / item['n']:.0%})"
+            elif kind == "percent":
+                cell = f"{value:.1%}"
+            else:
+                cell = f"{value:.1f}"
+            row.append(cell)
         lines.append("| " + " | ".join(row) + " |")
-    lines.extend(["", "## 依据核验", ""])
-    lines.append(
-        "| 模型 | 评委幻觉论文标记 | 有工具外论文号的场次 | 论文号依据率 |"
+
+    lines.extend(
+        [
+            "",
+            "## 明确 arXiv 号核验（自动，不进总分）",
+            "",
+            "只核验回复中明确写出的 arXiv ID；不覆盖无编号的标题、作者、数字或仓库。",
+            "“依据率”按全部明确 ID 微平均，不是逐场比例平均。",
+            "",
+        ]
     )
-    lines.append("| --- | --- | --- | --- |")
+    lines.append(
+        "| 模型 | 回复明确 ID | 工具内 ID | 工具外 ID | ID 依据率 | 有工具外 ID 的场次 |"
+    )
+    lines.append("| --- | --- | --- | --- | --- | --- |")
     for tag in present:
         item = models[tag]
-        rate = (item.get("automatic") or {}).get("arxiv_grounded_rate")
+        auto = item.get("automatic") or {}
+        rate = auto.get("arxiv_grounded_rate")
         lines.append(
             f"| {MODEL_LABELS.get(tag, tag)} | "
-            f"{item.get('judge_hallucinated_paper', 0)}/{item['n']} | "
-            f"{item.get('sessions_with_ungrounded_arxiv', 0)}/{item['n']} | "
-            f"{'—' if rate is None else f'{rate:.3f}'} |"
+            f"{auto.get('arxiv_mentions_total', 0)} | "
+            f"{auto.get('arxiv_grounded_total', 0)} | "
+            f"{auto.get('arxiv_ungrounded_total', 0)} | "
+            f"{'—' if rate is None else f'{rate:.1%}'} | "
+            f"{item.get('sessions_with_ungrounded_arxiv', 0)}/{item['n']} |"
+        )
+
+    lines.extend(["", "## 输出特征（描述性，不进总分）", ""])
+    lines.append(
+        "| 指标 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |"
+    )
+    lines.append("| --- | " + " | ".join("---" for _ in present) + " |")
+    row = ["助手字符数 / 轮"]
+    for tag in present:
+        value = (models[tag].get("automatic") or {}).get("assistant_chars_per_turn")
+        row.append("—" if value is None else f"{value:.0f}")
+    lines.append("| " + " | ".join(row) + " |")
+
+    lines.extend(
+        [
+            "",
+            "## 评委告警（模型判断，不是自动指标）",
+            "",
+            "幻觉告警可覆盖无编号标题、作者、指标和仓库，因此不能与 ID 核验互相替代。",
+            "",
+            "| 模型 | 幻觉论文告警 | 倾泻清单告警 | 该查未查告警 |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
+    for tag in present:
+        item = models[tag]
+        flags = item.get("flag_counts") or {}
+        lines.append(
+            f"| {MODEL_LABELS.get(tag, tag)} | "
+            f"{flags.get('hallucinated_paper', 0)}/{item['n']} | "
+            f"{flags.get('dump_list', 0)}/{item['n']} | "
+            f"{flags.get('no_tool', 0)}/{item['n']} |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## 条件场景检查（不进总分）",
+            "",
+            "仅统计虚拟用户明确执行 `ask_identity` 的场次；这是名称遵循率，不代表总体质量。",
+            "",
+            "| 模型 | 被问身份时自称小埋 |",
+            "| --- | --- |",
+        ]
+    )
+    for tag in present:
+        item = models[tag]
+        lines.append(
+            f"| {MODEL_LABELS.get(tag, tag)} | "
+            f"{item.get('identity_hits', 0)}/{item.get('identity_asked', 0)} |"
         )
     lines.extend(["", "## 按角色总分", ""])
     lines.append("| 角色 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |")
