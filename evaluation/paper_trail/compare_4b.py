@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import random
+import shutil
 import signal
 import subprocess
 import sys
@@ -442,10 +443,14 @@ async def collect_model(
     return results
 
 
-async def judge_run(run_dir: Path, user_config: dict) -> dict:
+async def judge_run(run_dir: Path, user_config: dict, *, rejudge: bool = False) -> dict:
     scores_path = run_dir / "scores.json"
     judged_by_key = {}
-    if scores_path.is_file():
+    if rejudge and scores_path.is_file():
+        backup = run_dir / "scores.prev.json"
+        shutil.copy2(scores_path, backup)
+        tqdm.write(f"已备份旧分数 → {backup}，按当前评委输入重打")
+    elif scores_path.is_file():
         try:
             previous = json.loads(scores_path.read_text())
             for row in previous.get("sessions") or []:
@@ -598,6 +603,11 @@ def parse_args(argv=None):
         help="从蒸馏 constructed/ 抽样教师 flash 场次并打分，不重新对话",
     )
     parser.add_argument("--skip-judge", action="store_true")
+    parser.add_argument(
+        "--rejudge",
+        action="store_true",
+        help="忽略已有分数，按当前评委输入重打（旧 scores.json 备份为 scores.prev.json）",
+    )
     parser.add_argument("--skip-vllm-swap", action="store_true", help="不启停 vLLM，假定端口已是对应模型")
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 条人设，调试用")
     parser.add_argument("--dry-sample", action="store_true")
@@ -670,7 +680,7 @@ async def async_main(args) -> int:
     if args.skip_judge:
         tqdm.write("已跳过打分。")
         return 0
-    payload = await judge_run(run_dir, user_config)
+    payload = await judge_run(run_dir, user_config, rejudge=args.rejudge)
     payload["run_id"] = run_dir.name
     payload["max_turns"] = args.max_turns
     report = render_report(payload)

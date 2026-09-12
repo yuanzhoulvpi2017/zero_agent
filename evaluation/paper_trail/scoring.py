@@ -15,39 +15,49 @@ ARXIV_RE = re.compile(r"\b(\d{4}\.\d{4,5})(?:v\d+)?\b")
 JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.I)
 XIAOMI = "小埋"
 
+# 只保留互不重复、能进总分的三维。工具次数、论文号依据率、身份命中是自动指标，不进总分。
 DIMENSIONS = {
-    "tool_use": "工具使用：该检索/阅读时是否真的调用工具；失败时是否说明限制而不是编造。",
-    "grounding": "来源依据：论文身份、链接、作者是否像真实工具结果；是否区分已读/未读。",
-    "helpfulness": "有用程度：是否对准用户这一轮真正在问的事，而不是自说自话。",
-    "clarification": "澄清追问：兴趣含糊时是否先问清，而不是一次堆砌大量论文。",
-    "persona_fit": "人设适配：是否按对方知识水平和口气说话，不过于说教或过于空泛。",
-    "dialogue_quality": "对话质量：是否承接上文、长度合适、像在聊天而不是贴说明书。",
-    "research_progress": "研究推进：多轮之后问题、对比或下一步是否比开头更清楚。",
-    "identity": "身份与边界：被问名字/创建者时是否自称小埋；不保证新颖、不编实验结果。",
+    "grounding": "依据：该查时是否查了；失败是否承认；具体论文信息是否在工具证据里。",
+    "helpfulness": "有用：是否帮对方完成这场所说出口的事，当轮接得住，整场有推进。",
+    "dialogue": "对话：含糊先问清、长短可控、承接上文、少乱码、不倾泻清单。",
 }
 
-JUDGE_SYSTEM = """你是论文探索助手「小埋」的严格评审。根据完整对话轨迹，只评价助手表现，不要评价虚拟用户。
+JUDGE_SYSTEM = """你是论文探索助手「小埋」的严格评审。只评价助手，不评价虚拟用户。只依据给定轨迹，不要检索外网。
 
-打分规则：
-- 每个维度给 1–5 的整数：1 很差，2 较差，3 一般，4 良好，5 优秀。
-- 没有工具、却像亲历其境地讲具体论文/实验数字，grounding 和 tool_use 必须压低。
-- 用户含糊时若助手直接倾泻十来篇论文，clarification 应偏低。
-- 被问「你是谁/叫什么」却不提小埋或乱认身份，identity 应偏低；本段对话若没问身份，identity 给 3 或 4 即可，不要因此打满分。
-- 只依据给定轨迹，不要检索外网。
+只打三个分数。不要给工具使用、对象适配、身份、澄清、研究推进单独打分——那些要么并进下面三维，要么只标 flags / 不进总分。
+每个维度 1–5 整数。同一问题只打进一维。
+
+【依据 grounding】
+该检索或阅读具体论文时是否调了工具；失败是否承认没读到；回复里的论文号/标题/作者/数字/仓库是否出现在「本场工具返回过的论文」或当轮「工具证据」。
+只搜到条目、没读全文时，必须区分「只看到检索结果」和「读过正文」。
+2024–2026 年 arXiv 编号（2512.x、2602.x、2609.x）是正常的。证据里有的编号不是幻觉。
+1=该查不查，或证据外编论文/作者/指标。5=该出手时出手，具体信息对得上证据，不确定就说不确定。
+不看：话多话少、乱码、有没有自称小埋。
+
+【有用 helpfulness】
+对方已经说出口的事有没有被帮到：开题要一句能写的、工程师要能不能跑、综述要放哪一节、质疑者要对比和限制。
+当轮要接得住；整场结束要比开头更清楚，能带走一点可执行的。
+只根据对方说出来的话判断，不要用「内心目标」扣分，也不要另打「像不像这个身份」。
+1=答非所问，或十轮后仍在原地、被错误信息带偏。5=接住当轮问题，并收束到更清楚的问题或短名单。
+不看：论文号在不在工具里（归依据）；清单太长或乱码（归对话）。
+
+【对话 dialogue】
+含糊时是否先问清再堆论文；用户说短一点就缩短；承接上文；中文可读、少乱码；不一次倾泻十几篇还不停。
+1=含糊就倾泻、无视「短一点」、明显乱码或自说自话。5=该问就问，长短像在聊，接得上。
+不看：有没有编论文（归依据）；帮没帮上忙（归有用）。
+
+自称小埋、谁做的：本场若被问到却不提小埋，只标 identity_miss，不要为此压低三维分数。没问就忽略。
+
+flags 只用：hallucinated_paper（证据外的论文身份）、no_tool（该查不查）、dump_list（一次倾泻大量论文且不收敛）、identity_miss（被问身份却不提小埋）。
 
 只输出一个 JSON 对象，不要 markdown、不要解释。字段：
 {
   "scores": {
-    "tool_use": 1,
     "grounding": 1,
     "helpfulness": 1,
-    "clarification": 1,
-    "persona_fit": 1,
-    "dialogue_quality": 1,
-    "research_progress": 1,
-    "identity": 1
+    "dialogue": 1
   },
-  "rationale": "用中文写 3–6 句：优点、问题、是否像在幻觉论文。",
+  "rationale": "用中文写 3–6 句，按依据/有用/对话说。点名论文时说明该编号是否在工具证据里。",
   "flags": ["可空的短标签，如 hallucinated_paper / no_tool / dump_list / identity_miss"]
 }
 """
@@ -111,8 +121,106 @@ def session_turns(chain: dict, max_turns: int | None = None) -> list:
     return turns
 
 
+def _tool_result_text(block: dict, message: dict | None = None) -> str:
+    output = block.get("output")
+    text = _text(output)
+    if text:
+        return text
+    if message is not None:
+        return _text(message.get("content"))
+    return ""
+
+
+def iter_tool_results(turn: dict):
+    for message in turn.get("agent_messages") or []:
+        content = message.get("content")
+        blocks = content if isinstance(content, list) else []
+        for block in blocks:
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                yield block, message
+
+
+def iter_tool_uses(turn: dict):
+    for message in turn.get("agent_messages") or []:
+        content = message.get("content")
+        blocks = content if isinstance(content, list) else []
+        for block in blocks:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                yield block
+
+
+def _add_paper(entries: list[dict], seen: set[str], pid, title: str = "") -> None:
+    blob = str(pid or "")
+    ids = ARXIV_RE.findall(blob)
+    if not ids and blob:
+        match = ARXIV_RE.search(blob)
+        if match:
+            ids = [match.group(1)]
+    for arxiv in ids:
+        if arxiv in seen:
+            continue
+        seen.add(arxiv)
+        entries.append({"id": arxiv, "title": (title or "").strip()[:80]})
+
+
+def papers_from_payload(payload: dict | None, raw_text: str = "") -> list[dict]:
+    entries: list[dict] = []
+    seen: set[str] = set()
+    if payload:
+        data = payload.get("data")
+        items = data if isinstance(data, list) else ([data] if isinstance(data, dict) else [])
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            _add_paper(entries, seen, item.get("id"), item.get("title") or "")
+        for key in ("arxiv_url", "source", "pdf_url", "error"):
+            _add_paper(entries, seen, payload.get(key) or "")
+    _add_paper(entries, seen, raw_text or "")
+    return entries
+
+
+def papers_from_turn(turn: dict) -> list[dict]:
+    entries: list[dict] = []
+    seen: set[str] = set()
+    for block, message in iter_tool_results(turn):
+        raw = _tool_result_text(block, message)
+        for paper in papers_from_payload(_parse_tool_payload(raw), raw):
+            _add_paper(entries, seen, paper["id"], paper.get("title") or "")
+    return entries
+
+
+def format_paper_list(papers: list[dict], limit: int = 12) -> str:
+    if not papers:
+        return "（无论文号）"
+    parts = []
+    for paper in papers[:limit]:
+        title = paper.get("title") or ""
+        parts.append(f"{paper['id']}" + (f" {title}" if title else ""))
+    if len(papers) > limit:
+        parts.append(f"另{len(papers) - limit}篇")
+    return "；".join(parts)
+
+
+def summarize_tool_result(block: dict, message: dict | None = None) -> str:
+    name = block.get("name") or "tool"
+    raw = _tool_result_text(block, message)
+    payload = _parse_tool_payload(raw)
+    papers = papers_from_payload(payload, raw)
+    if payload is None:
+        status = "called"
+        extra = format_paper_list(papers, 6) if papers else ""
+        return f"{name}:{status}" + (f" {extra}" if extra else "")
+    if payload.get("ok") is False:
+        error = str(payload.get("error") or "失败").replace("\n", " ")[:60]
+        extra = format_paper_list(papers, 4) if papers else ""
+        return f"{name}:err {error}" + (f" [{extra}]" if extra else "")
+    if papers:
+        return f"{name}:ok {format_paper_list(papers, 8)}"
+    return f"{name}:ok"
+
+
 def compact_session(
-    directory: Path, max_chars: int = 9000, max_turns: int | None = None
+    directory: Path, max_chars: int = 18000, max_turns: int | None = None
 ) -> str:
     directory = Path(directory)
     persona = json.loads((directory / "persona.json").read_text())
@@ -120,51 +228,47 @@ def compact_session(
     plan = list(persona.get("jump_plan") or [])
     if max_turns is not None:
         plan = plan[:max_turns]
+    turns = session_turns(chain, max_turns)
+    inventory: list[dict] = []
+    seen: set[str] = set()
+    for turn in turns:
+        for paper in papers_from_turn(turn):
+            _add_paper(inventory, seen, paper["id"], paper.get("title") or "")
+    knowledge = persona.get("knowledge") or "?"
+    knowledge_hint = {
+        "novice": "少黑话，先讲人话",
+        "working": "可以跟论文走，要落到能用的一句",
+        "expert": "别科普常识，给对比和依据",
+    }.get(knowledge, "按对方已说出的话判断深浅")
     lines = [
-        f"人设：{persona.get('name')} / {persona.get('category_label')} / "
-        f"知识={persona.get('knowledge')} / 话题={persona.get('topic')} / "
-        f"口吻={persona.get('voice')}",
-        f"内心目标（助手不应被直接告知）：{persona.get('goal')}",
+        "对方（虚拟用户。「有用」只看对方已经说出口的事，不要用内心目标扣分）：",
+        f"称呼={persona.get('name')} / 角色={persona.get('category_label')} / "
+        f"知识水平={knowledge}（{knowledge_hint}）",
+        f"话题={persona.get('topic')}",
+        f"对方说话习惯={persona.get('voice')}",
+        f"内心目标（用户不会直说，助手当时也看不到；不要用来扣分）："
+        f"{persona.get('goal')}",
         f"跳转计划：{' → '.join(plan)}",
+        f"本场工具返回过的论文（核验用）：{format_paper_list(inventory, 24)}",
         "",
     ]
-    for turn in session_turns(chain, max_turns):
+    for turn in turns:
         index = int(turn.get("turn_index") or 0) + 1
         move = turn.get("move") or "?"
         user = ((turn.get("user") or {}).get("text") or "").strip()
         assistant = assistant_text(turn)
-        tools = []
-        for message in turn.get("agent_messages") or []:
-            content = message.get("content")
-            blocks = content if isinstance(content, list) else []
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                if block.get("type") == "tool_use":
-                    name = block.get("name") or "tool"
-                    payload = None
-                    for later in turn.get("agent_messages") or []:
-                        later_blocks = later.get("content") if isinstance(later.get("content"), list) else []
-                        for item in later_blocks:
-                            if not isinstance(item, dict) or item.get("type") != "tool_result":
-                                continue
-                            if item.get("id") != block.get("id") and item.get("name") != name:
-                                continue
-                            payload = _parse_tool_payload(_text(item.get("output") or later.get("content")))
-                            if payload is not None:
-                                break
-                        if payload is not None:
-                            break
-                    status = "ok" if payload and payload.get("ok") else (
-                        "err" if payload and payload.get("ok") is False else "called"
-                    )
-                    tools.append(f"{name}:{status}")
-                elif block.get("type") == "tool_result":
-                    continue
-        tool_bit = f" 工具[{', '.join(tools)}]" if tools else " 工具[无]"
+        tools = [summarize_tool_result(block, message) for block, message in iter_tool_results(turn)]
+        if not tools:
+            uses = [block.get("name") or "tool" for block in iter_tool_uses(turn)]
+            tool_bit = f" 工具[{', '.join(f'{name}:called' for name in uses)}]" if uses else " 工具[无]"
+        else:
+            tool_bit = " 工具[有]"
         if len(assistant) > 700:
             assistant = assistant[:700].rstrip() + "…"
         lines.append(f"第{index}轮 move={move}{tool_bit}")
+        if tools:
+            for item in tools:
+                lines.append(f"工具证据：{item}")
         lines.append(f"用户：{user}")
         lines.append(f"小埋：{assistant or '（无正文）'}")
         lines.append("")
@@ -185,6 +289,7 @@ def automatic_metrics(directory: Path, max_turns: int | None = None) -> dict:
     tool_ok = 0
     tool_err = 0
     arxiv_ids: list[str] = []
+    tool_arxiv: list[str] = []
     assistant_chars = 0
     identity_asked = False
     identity_hit = False
@@ -193,26 +298,22 @@ def automatic_metrics(directory: Path, max_turns: int | None = None) -> dict:
         body = assistant_text(turn)
         assistant_chars += len(body)
         arxiv_ids.extend(ARXIV_RE.findall(body))
+        for paper in papers_from_turn(turn):
+            tool_arxiv.append(paper["id"])
         if move == "ask_identity":
             identity_asked = True
             if XIAOMI in body:
                 identity_hit = True
-        for message in turn.get("agent_messages") or []:
-            content = message.get("content")
-            blocks = content if isinstance(content, list) else []
-            for block in blocks:
-                if not isinstance(block, dict):
-                    continue
-                if block.get("type") == "tool_use":
-                    tool_names.append(block.get("name") or "tool")
-                elif block.get("type") == "tool_result":
-                    payload = _parse_tool_payload(_text(block.get("output") or content))
-                    if payload is None:
-                        continue
-                    if payload.get("ok") is True:
-                        tool_ok += 1
-                    elif payload.get("ok") is False:
-                        tool_err += 1
+        for block in iter_tool_uses(turn):
+            tool_names.append(block.get("name") or "tool")
+        for block, message in iter_tool_results(turn):
+            payload = _parse_tool_payload(_tool_result_text(block, message))
+            if payload is None:
+                continue
+            if payload.get("ok") is True:
+                tool_ok += 1
+            elif payload.get("ok") is False:
+                tool_err += 1
     names = Counter(tool_names)
     usage = dict(manifest.get("session_usage") or {})
     if max_turns and source_turns and len(source_turns) > max_turns:
@@ -224,6 +325,11 @@ def automatic_metrics(directory: Path, max_turns: int | None = None) -> dict:
         max_turns is None or len(source_turns) >= max_turns
     )
     requested = int(max_turns or persona.get("max_turns") or len(turns))
+    reply_ids = list(dict.fromkeys(arxiv_ids))
+    tool_ids = list(dict.fromkeys(tool_arxiv))
+    tool_set = set(tool_ids)
+    grounded = [item for item in reply_ids if item in tool_set]
+    ungrounded = [item for item in reply_ids if item not in tool_set]
     return {
         "status": manifest.get("status"),
         "completed": completed,
@@ -238,7 +344,15 @@ def automatic_metrics(directory: Path, max_turns: int | None = None) -> dict:
         "tools": dict(names),
         "used_search": names.get("search_papers", 0) > 0,
         "used_read": names.get("read_paper", 0) > 0,
-        "arxiv_mentions": len(set(arxiv_ids)),
+        "arxiv_mentions": len(reply_ids),
+        "tool_arxiv_ids": tool_ids,
+        "reply_arxiv_ids": reply_ids,
+        "arxiv_grounded": len(grounded),
+        "arxiv_ungrounded": len(ungrounded),
+        "arxiv_grounded_rate": (
+            round(len(grounded) / len(reply_ids), 3) if reply_ids else None
+        ),
+        "ungrounded_arxiv_ids": ungrounded,
         "assistant_chars": assistant_chars,
         "elapsed_seconds": usage.get("elapsed_seconds"),
         "total_tokens": usage.get("total_tokens"),
@@ -356,6 +470,9 @@ def summarize_scores(rows: list[dict]) -> dict:
             "tool_calls",
             "tool_ok_rate",
             "arxiv_mentions",
+            "arxiv_grounded",
+            "arxiv_ungrounded",
+            "arxiv_grounded_rate",
             "assistant_chars",
             "elapsed_seconds",
             "turn_complete_rate",
@@ -370,6 +487,14 @@ def summarize_scores(rows: list[dict]) -> dict:
             if values:
                 automatic[key] = round(mean(values), 3)
         completed = sum(1 for item in items if (item.get("automatic") or {}).get("completed"))
+        flag_counts = Counter()
+        for item in items:
+            flag_counts.update(item.get("flags") or [])
+        sessions_ungrounded = sum(
+            1
+            for item in items
+            if (item.get("automatic") or {}).get("arxiv_ungrounded", 0)
+        )
         identity = [
             item
             for item in items
@@ -386,6 +511,9 @@ def summarize_scores(rows: list[dict]) -> dict:
             "overall_std": round(pstdev(overalls), 3) if len(overalls) > 1 else 0.0,
             "dimensions": dim_means,
             "automatic": automatic,
+            "flag_counts": dict(flag_counts),
+            "sessions_with_ungrounded_arxiv": sessions_ungrounded,
+            "judge_hallucinated_paper": flag_counts.get("hallucinated_paper", 0),
             "identity_hit_rate": (
                 round(
                     mean(
@@ -459,6 +587,7 @@ def render_report(payload: dict) -> str:
             [
                 "教师场次取自蒸馏 `constructed/`（`deepseek-v4-flash`），按同样 8 类 × 2 场抽样，"
                 "**只评前 10 轮**，不再重新对话。与 4B 不是同一段用户话，只对齐协议与评委。",
+                "评委轨迹含工具返回的论文号/标题；回复里对得上的编号不算幻觉，2024–2026 年号不当成未来。",
                 "",
             ]
         )
@@ -515,6 +644,9 @@ def render_report(payload: dict) -> str:
         "tool_calls",
         "tool_ok_rate",
         "arxiv_mentions",
+        "arxiv_grounded",
+        "arxiv_ungrounded",
+        "arxiv_grounded_rate",
         "assistant_chars",
         "elapsed_seconds",
         "turn_complete_rate",
@@ -524,6 +656,9 @@ def render_report(payload: dict) -> str:
         "tool_calls": "工具调用次数",
         "tool_ok_rate": "工具成功比例",
         "arxiv_mentions": "提到的 arXiv 数",
+        "arxiv_grounded": "回复论文号在工具内",
+        "arxiv_ungrounded": "回复论文号在工具外",
+        "arxiv_grounded_rate": "论文号依据率",
         "assistant_chars": "助手字数",
         "elapsed_seconds": "耗时（秒）",
         "turn_complete_rate": "轮次完成率",
@@ -534,6 +669,20 @@ def render_report(payload: dict) -> str:
             value = (models[tag].get("automatic") or {}).get(key)
             row.append("—" if value is None else f"{value:.3f}")
         lines.append("| " + " | ".join(row) + " |")
+    lines.extend(["", "## 依据核验", ""])
+    lines.append(
+        "| 模型 | 评委幻觉论文标记 | 有工具外论文号的场次 | 论文号依据率 |"
+    )
+    lines.append("| --- | --- | --- | --- |")
+    for tag in present:
+        item = models[tag]
+        rate = (item.get("automatic") or {}).get("arxiv_grounded_rate")
+        lines.append(
+            f"| {MODEL_LABELS.get(tag, tag)} | "
+            f"{item.get('judge_hallucinated_paper', 0)}/{item['n']} | "
+            f"{item.get('sessions_with_ungrounded_arxiv', 0)}/{item['n']} | "
+            f"{'—' if rate is None else f'{rate:.3f}'} |"
+        )
     lines.extend(["", "## 按角色总分", ""])
     lines.append("| 角色 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |")
     lines.append("| --- | " + " | ".join("---" for _ in present) + " |")

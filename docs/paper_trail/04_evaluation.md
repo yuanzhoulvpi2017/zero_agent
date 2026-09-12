@@ -50,20 +50,15 @@ python interface/run_paper_trail.py --sft
 
 协议：8 类虚拟人各 2 场，每场最多 10 轮。虚拟用户始终是 `deepseek-v4-flash`。小埋分别接未训练 Qwen3.5-4B 与合并后的 SFT（当场采集）。教师列**复用蒸馏已有轨迹**（`data/paper_trail/constructed/`，同 8 类 × 2 场、只评前 10 轮），不重新调用 flash 当助手。工具、系统提示对齐；4B 与教师不是同一段用户话，只对齐协议与评委。
 
-打分也用 `deepseek-v4-flash`，维度：
+打分也用 `deepseek-v4-flash`。总分只平均三维；八维等权已弃用（身份常没被问、对象适配和有用重复、不调工具会重复扣分）。
 
-| 维度 | 看什么 |
-| --- | --- |
-| tool_use | 该搜/读时是否调用工具，失败是否承认 |
-| grounding | 论文身份和链接是否像真实检索，是否区分已读未读 |
-| helpfulness | 是否对准用户当轮问题 |
-| clarification | 含糊时是否追问，而不是一次堆论文 |
-| persona_fit | 是否匹配对方知识水平和口气 |
-| dialogue_quality | 是否承接上文、长度合适 |
-| research_progress | 多轮后问题/对比/下一步是否更清楚 |
-| identity | 被问身份时是否自称小埋；不编实验、不保证新颖 |
+| 字段 | 中文 | 看什么 | 不看什么 |
+| --- | --- | --- | --- |
+| grounding | 依据 | 该查时是否查了、失败是否承认、论文号/作者/数字是否在工具证据里 | 话多话少、乱码、自称小埋 |
+| helpfulness | 有用 | 对方已经说出口的事帮到没有；当轮接得住，整场有推进 | 论文号在不在工具里；清单太长 |
+| dialogue | 对话 | 含糊先问清、长短可控、接上文、少乱码、不倾泻清单 | 有没有编论文；帮没帮上忙 |
 
-另统计工具次数、工具成功率、提到的 arXiv 数、耗时，以及同一人设上 SFT 对基座的配对胜率。
+评委轨迹会带上工具返回的论文号和标题；回复里对得上的编号不算幻觉，2024–2026 年号不当成未来。另统计工具次数、论文号依据率、耗时，以及同一人设上 SFT 对基座的配对胜率。
 
 ```bash
 # 只看采样到的 16 条人设
@@ -77,6 +72,10 @@ python evaluation/paper_trail/run_paper_trail_eval.py
 python evaluation/paper_trail/run_paper_trail_eval.py \
   --run-dir data/paper_trail/eval/<run_id> --skip-collect --skip-vllm-swap --score-teacher
 
+# 评委输入改过之后重打分（旧 scores.json 备份为 scores.prev.json）
+python evaluation/paper_trail/run_paper_trail_eval.py \
+  --run-dir data/paper_trail/eval/<run_id> --skip-collect --skip-vllm-swap --rejudge
+
 # 中断后续跑同一目录
 python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail/eval/<run_id>
 ```
@@ -85,15 +84,15 @@ python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail
 
 ## 本次结果 · `compare-4b-20260911`
 
-评委 `deepseek-v4-flash`。8 类 × 2 场 × 10 轮。4B 当场采集；教师从蒸馏轨迹抽样只评前 10 轮。
+评委 `deepseek-v4-flash`。8 类 × 2 场 × 10 轮。4B 当场采集；教师从蒸馏轨迹抽样只评前 10 轮。总分三维：依据 / 有用 / 对话。
 
-**教师 3.77，两个 4B 约 2.1–2.3。** SFT 工具行为靠近教师，依据和幻觉没有。
+**教师 4.69，SFT 2.06，基座 1.90。** SFT 依据高于基座（2.06 vs 1.56），对话略差。论文号依据率教师 100%、SFT 74%。
 
-| 模型 | 总分 | 工具调用 | 读论文 | 幻觉论文标记 |
-| --- | --- | --- | --- | --- |
-| 教师 flash | **3.77 ± 0.40** | 18.8 | 81% | **2/16** |
-| 未训 4B | 2.32 ± 0.22 | 3.5 | 25% | 15/16 |
-| SFT 4B | 2.15 ± 0.35 | 9.3 | 75% | 16/16 |
+| 模型 | 总分 | 依据 | 有用 | 对话 | 幻觉论文标记 | 论文号依据率 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 教师 flash | **4.69 ± 0.30** | **4.75** | **4.94** | **4.38** | **0/16** | **100%** |
+| SFT 4B | 2.06 ± 0.48 | 2.06 | 2.19 | 1.94 | 13/16 | 74% |
+| 未训 4B | 1.90 ± 0.40 | 1.56 | 2.00 | 2.13 | 13/16 | 88% |
 
 完整表见 [evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)。
 
@@ -104,3 +103,5 @@ python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail
 - [x] 网页 `--sft` 指向本地推理
 - [x] 未训基座 vs SFT 的虚拟人批量对比（flash 打分）
 - [x] 与教师 flash 同协议对比（复用蒸馏轨迹，只评前 10 轮）
+- [x] 评委轨迹带工具论文号/标题，并按此复评已有场次
+- [x] 打分收到三维（依据 / 有用 / 对话）；身份和工具次数只做自动指标
