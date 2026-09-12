@@ -58,8 +58,8 @@ Agent 名叫「小埋」，由 B站 UP主「良睦路程序员」创建。目录
   merge LoRA → vLLM :8001
         │
         ▼
-  同一套虚拟人协议对比 未训 4B vs SFT
-  评委仍是 deepseek-v4-flash
+  同一套虚拟人协议对比 教师 flash / 未训 4B / SFT
+  评委仍是 deepseek-v4-flash；教师列复用蒸馏轨迹打分
 ```
 
 阶段可以反复跑，旧实验目录不覆盖。网页不必等训练完成，随时可对话、回看轨迹。
@@ -73,7 +73,7 @@ Agent 名叫「小埋」，由 B站 UP主「良睦路程序员」创建。目录
 | 采集 | 8 类虚拟人（硕/博/老师/工程师/综述/转行/独立/组会质疑），开口短、含糊，像微信。最多 20 轮。 | [interface/run_paper_trail_collect.py](interface/run_paper_trail_collect.py)、[02_dataset.md](docs/paper_trail/02_dataset.md) |
 | 数据 | `llm_calls` → Qwen3.5 SFT jsonl；超长先压旧 tool 再丢旧轮，不切开最后一句 assistant。 | [dataset/paper_trail_data/to_sft.py](dataset/paper_trail_data/to_sft.py) |
 | 训练 | TRL QLoRA，3090+3060 按层拆卡，默认 16k。不要设 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`。合并后再给 vLLM，不要 `--enable-lora`。 | [03_training.md](docs/paper_trail/03_training.md) |
-| 评测 | 8 类 × 2 场 × 10 轮；虚拟用户始终 flash；工具/提示/限制对齐。打分维度：工具、来源、有用、澄清、人设、对话、研究推进、身份。 | [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md) |
+| 评测 | 8 类 × 2 场 × 10 轮；虚拟用户始终 flash。4B 当场采集，教师复用蒸馏轨迹只评前 10 轮。打分维度：工具、来源、有用、澄清、人设、对话、研究推进、身份。 | [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md) |
 
 #### 怎么跑
 
@@ -97,13 +97,16 @@ python interface/run_paper_trail.py --sft
 # 4) 基座 4B vs SFT（会切换 :8001 上的模型）
 python evaluation/paper_trail/run_paper_trail_eval.py --dry-sample
 python evaluation/paper_trail/run_paper_trail_eval.py
+# 教师列：复用蒸馏轨迹打分，不重新对话
+python evaluation/paper_trail/run_paper_trail_eval.py \
+  --run-dir data/paper_trail/eval/<run_id> --skip-collect --skip-vllm-swap --score-teacher
 ```
 
 #### 当前进度与一次评测
 
-- Agent、网页、虚拟人采集、SFT 转换、QLoRA 1 epoch、vLLM 部署、基座 vs SFT 对比均已跑通。
+- Agent、网页、虚拟人采集、SFT 转换、QLoRA 1 epoch、vLLM 部署、教师 / 基座 / SFT 同协议对比均已跑通。
 - 教师对话走 `configs/paper_trail/agent.toml`；本地 SFT 走 `agent_sft.toml`（`http://127.0.0.1:8001/v1`，模型名 `paper-trail-sft`）。
-- 一次对比（`compare-4b-20260911`，flash 评委，各 16 场）：SFT **更会用工具**（每场 9.3 次 vs 3.5，读论文 75% vs 25%），回复更短；但总分 2.15 vs 基座 2.32，评委几乎每场都打了幻觉论文。细节表见 [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md)。
+- 一次对比（`compare-4b-20260911`，flash 评委，各 16 场）：教师 **3.77**，未训 4B **2.32**，SFT **2.15**。SFT 更会用工具（读论文 75% vs 基座 25%，教师 81%），但幻觉标记 16/16，教师只有 2/16。细节表见 [evaluation/paper_trail/README.md](evaluation/paper_trail/README.md)。
 
 分阶段教程：[业务总览](docs/paper_trail/README.md) · [Agent](docs/paper_trail/01_agent.md) · [数据](docs/paper_trail/02_dataset.md) · [训练](docs/paper_trail/03_training.md) · [评测](docs/paper_trail/04_evaluation.md) · [界面](docs/paper_trail/05_interface.md)。
 

@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import os
+import random
 import signal
 import subprocess
 import sys
@@ -25,6 +26,7 @@ if str(DATASET) not in sys.path:
 from paper_trail.cache import ResponseCache  # noqa: E402
 from paper_trail.collect import collect_one  # noqa: E402
 from paper_trail.runtime import (  # noqa: E402
+    constructed_root,
     data_root,
     load_settings,
     user_llm_settings,
@@ -33,6 +35,7 @@ from paper_trail_data import personas as personas_mod  # noqa: E402
 
 from scoring import (  # noqa: E402
     DIMENSIONS,
+    MODEL_ORDER,
     FlashJudge,
     automatic_metrics,
     render_report,
@@ -88,11 +91,97 @@ def sample_eval_personas(seed: int, max_turns: int, replicas: int) -> list[dict]
     people = []
     for index, category in enumerate(personas_mod.CATEGORIES):
         for replica in range(replicas):
-            rng = __import__("random").Random(seed + index * 17 + replica)
+            rng = random.Random(seed + index * 17 + replica)
             persona = personas_mod.sample_persona(rng, category, max_turns=max_turns)
             persona["eval_replica"] = replica
             people.append(persona)
     return people
+
+
+def import_teacher_sessions(
+    run_dir: Path,
+    *,
+    seed: int,
+    replicas: int,
+    scored_turns: int,
+    min_turns: int = 10,
+    max_source_turns: int = 12,
+) -> list[dict]:
+    """Reuse distillation constructed dialogues; do not call the teacher again."""
+    pool: dict[str, list] = {key: [] for key in personas_mod.CATEGORIES}
+    for path in constructed_root().iterdir():
+        if not path.is_dir():
+            continue
+        persona_path = path / "persona.json"
+        chain_path = path / "dialogue_chain.json"
+        manifest_path = path / "manifest.json"
+        if not (persona_path.is_file() and chain_path.is_file() and manifest_path.is_file()):
+            continue
+        try:
+            persona = json.loads(persona_path.read_text())
+            chain = json.loads(chain_path.read_text())
+            manifest = json.loads(manifest_path.read_text())
+        except (OSError, ValueError):
+            continue
+        if manifest.get("status") != "completed":
+            continue
+        if (manifest.get("config") or {}).get("model") != "deepseek-v4-flash":
+            continue
+        category = persona.get("category")
+        if category not in pool:
+            continue
+        turns = len(chain.get("turns") or [])
+        if not min_turns <= turns <= max_source_turns:
+            continue
+        pool[category].append(
+            {
+                "directory": str(path),
+                "persona_id": persona.get("id"),
+                "category": category,
+                "turns": turns,
+                "model": "deepseek-v4-flash",
+            }
+        )
+    rng = random.Random(seed)
+    selected = []
+    for category in personas_mod.CATEGORIES:
+        items = list(pool[category])
+        rng.shuffle(items)
+        if len(items) < replicas:
+            raise SystemExit(
+                f"蒸馏数据中 {category} 可用场次不足 {replicas} "
+                f"（需要 {min_turns}–{max_source_turns} 轮已完成会话）"
+            )
+        for replica, item in enumerate(items[:replicas]):
+            selected.append(
+                {
+                    **item,
+                    "storage_kind": "constructed",
+                    "eval_replica": replica,
+                    "scored_turns": scored_turns,
+                    "dialogue_chain": str(Path(item["directory"]) / "dialogue_chain.json"),
+                }
+            )
+    payload = {
+        "model_tag": "teacher",
+        "model": "deepseek-v4-flash",
+        "source": "data/paper_trail/constructed",
+        "scored_turns": scored_turns,
+        "min_turns": min_turns,
+        "max_source_turns": max_source_turns,
+        "seed": seed,
+        "note": "只评前 scored_turns 轮，不重新调用教师模型。",
+        "count": len(selected),
+        "results": selected,
+    }
+    teacher_dir = run_dir / "teacher"
+    teacher_dir.mkdir(parents=True, exist_ok=True)
+    write_json(teacher_dir / "collection.json", payload)
+    tqdm.write(
+        f"导入教师 {len(selected)} 条（每类 {replicas}，源轮次 {min_turns}–{max_source_turns}，"
+        f"评分 {scored_turns} 轮）→ {teacher_dir / 'collection.json'}"
+    )
+    return selected
 
 
 def find_completed(model_dir: Path, persona_id: str, max_turns: int) -> dict | None:
@@ -365,11 +454,12 @@ async def judge_run(run_dir: Path, user_config: dict) -> dict:
             judged_by_key = {}
     rows = []
     pending = []
-    for model_tag in ("base", "sft"):
+    for model_tag in MODEL_ORDER:
         collection_path = run_dir / model_tag / "collection.json"
         if not collection_path.is_file():
             continue
         collection = json.loads(collection_path.read_text())
+        scored_turns = collection.get("scored_turns")
         for item in collection.get("results") or []:
             if not item or item.get("error") or not item.get("directory"):
                 continue
@@ -377,15 +467,16 @@ async def judge_run(run_dir: Path, user_config: dict) -> dict:
             if key in judged_by_key:
                 rows.append(judged_by_key[key])
             else:
-                pending.append((model_tag, item))
+                pending.append((model_tag, {**item, "scored_turns": item.get("scored_turns", scored_turns)}))
     tqdm.write(f"打分：已有 {len(rows)} 条，待评 {len(pending)} 条")
     judge = FlashJudge(user_config)
     try:
         for model_tag, item in tqdm(pending, desc="flash 打分", unit="条", dynamic_ncols=True):
             directory = Path(item["directory"])
             persona = json.loads((directory / "persona.json").read_text())
-            auto = automatic_metrics(directory)
-            judged = await judge.judge_directory(directory)
+            scored_turns = item.get("scored_turns")
+            auto = automatic_metrics(directory, max_turns=scored_turns)
+            judged = await judge.judge_directory(directory, max_turns=scored_turns)
             row = {
                 "model_tag": model_tag,
                 "persona_id": persona["id"],
@@ -394,6 +485,7 @@ async def judge_run(run_dir: Path, user_config: dict) -> dict:
                 "name": persona.get("name"),
                 "topic": persona.get("topic"),
                 "directory": str(directory),
+                "scored_turns": scored_turns,
                 "automatic": auto,
                 **judged,
             }
@@ -425,7 +517,7 @@ def print_stats(payload: dict) -> None:
     pairwise = summary.get("pairwise") or {}
     tqdm.write("")
     tqdm.write("======== 对比统计 ========")
-    for tag in ("base", "sft"):
+    for tag in MODEL_ORDER:
         item = models.get(tag)
         if not item:
             continue
@@ -461,6 +553,12 @@ def build_manifest(run_dir: Path, args, personas: list[dict]) -> dict:
         "replicas": args.replicas,
         "concurrency": args.concurrency,
         "models": {
+            "teacher": {
+                "config": "configs/paper_trail/agent.toml",
+                "checkpoint": None,
+                "served_name": "deepseek-v4-flash",
+                "source": "data/paper_trail/constructed（蒸馏已有轨迹，只评前 10 轮）",
+            },
             "base": {
                 "config": str(CONFIGS["base"].relative_to(ROOT)),
                 "checkpoint": "model/Qwen/Qwen3.5-4B",
@@ -494,6 +592,11 @@ def parse_args(argv=None):
         help="采集顺序，逗号分隔：sft,base（默认先用当前已启动的 SFT）",
     )
     parser.add_argument("--skip-collect", action="store_true")
+    parser.add_argument(
+        "--score-teacher",
+        action="store_true",
+        help="从蒸馏 constructed/ 抽样教师 flash 场次并打分，不重新对话",
+    )
     parser.add_argument("--skip-judge", action="store_true")
     parser.add_argument("--skip-vllm-swap", action="store_true", help="不启停 vLLM，假定端口已是对应模型")
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 条人设，调试用")
@@ -530,6 +633,13 @@ async def async_main(args) -> int:
     manifest = build_manifest(run_dir, args, personas)
     write_json(run_dir / "manifest.json", manifest)
     user_config = user_llm_settings()
+    if args.score_teacher:
+        import_teacher_sessions(
+            run_dir,
+            seed=args.seed,
+            replicas=args.replicas,
+            scored_turns=args.max_turns,
+        )
     model_tags = [item.strip() for item in args.models.split(",") if item.strip()]
     for tag in model_tags:
         if tag not in CONFIGS:

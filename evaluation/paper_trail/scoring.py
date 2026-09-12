@@ -96,19 +96,39 @@ def assistant_text(turn: dict) -> str:
     return "\n".join(assistant.get("texts") or []).strip()
 
 
-def compact_session(directory: Path, max_chars: int = 9000) -> str:
+MODEL_ORDER = ("teacher", "base", "sft")
+MODEL_LABELS = {
+    "teacher": "教师 flash",
+    "base": "未训 4B",
+    "sft": "SFT 4B",
+}
+
+
+def session_turns(chain: dict, max_turns: int | None = None) -> list:
+    turns = list(chain.get("turns") or [])
+    if max_turns is not None:
+        turns = turns[: max(0, int(max_turns))]
+    return turns
+
+
+def compact_session(
+    directory: Path, max_chars: int = 9000, max_turns: int | None = None
+) -> str:
     directory = Path(directory)
     persona = json.loads((directory / "persona.json").read_text())
     chain = json.loads((directory / "dialogue_chain.json").read_text())
+    plan = list(persona.get("jump_plan") or [])
+    if max_turns is not None:
+        plan = plan[:max_turns]
     lines = [
         f"人设：{persona.get('name')} / {persona.get('category_label')} / "
         f"知识={persona.get('knowledge')} / 话题={persona.get('topic')} / "
         f"口吻={persona.get('voice')}",
         f"内心目标（助手不应被直接告知）：{persona.get('goal')}",
-        f"跳转计划：{' → '.join(persona.get('jump_plan') or [])}",
+        f"跳转计划：{' → '.join(plan)}",
         "",
     ]
-    for turn in chain.get("turns") or []:
+    for turn in session_turns(chain, max_turns):
         index = int(turn.get("turn_index") or 0) + 1
         move = turn.get("move") or "?"
         user = ((turn.get("user") or {}).get("text") or "").strip()
@@ -154,13 +174,13 @@ def compact_session(directory: Path, max_chars: int = 9000) -> str:
     return text
 
 
-def automatic_metrics(directory: Path) -> dict:
+def automatic_metrics(directory: Path, max_turns: int | None = None) -> dict:
     directory = Path(directory)
     persona = json.loads((directory / "persona.json").read_text())
     chain = json.loads((directory / "dialogue_chain.json").read_text())
-    trajectory = json.loads((directory / "trajectory.json").read_text())
     manifest = json.loads((directory / "manifest.json").read_text())
-    turns = chain.get("turns") or []
+    source_turns = list(chain.get("turns") or [])
+    turns = session_turns(chain, max_turns)
     tool_names: list[str] = []
     tool_ok = 0
     tool_err = 0
@@ -194,13 +214,21 @@ def automatic_metrics(directory: Path) -> dict:
                     elif payload.get("ok") is False:
                         tool_err += 1
     names = Counter(tool_names)
-    usage = manifest.get("session_usage") or {}
-    completed = manifest.get("status") == "completed"
-    requested = int(persona.get("max_turns") or len(turns))
+    usage = dict(manifest.get("session_usage") or {})
+    if max_turns and source_turns and len(source_turns) > max_turns:
+        ratio = max_turns / len(source_turns)
+        for key in ("elapsed_seconds", "total_tokens", "input_tokens", "output_tokens"):
+            if usage.get(key) is not None:
+                usage[key] = round(float(usage[key]) * ratio, 2)
+    completed = manifest.get("status") == "completed" and (
+        max_turns is None or len(source_turns) >= max_turns
+    )
+    requested = int(max_turns or persona.get("max_turns") or len(turns))
     return {
         "status": manifest.get("status"),
         "completed": completed,
         "turns": len(turns),
+        "source_turns": len(source_turns),
         "requested_turns": requested,
         "turn_complete_rate": round(len(turns) / requested, 3) if requested else 0.0,
         "tool_calls": len(tool_names),
@@ -280,8 +308,8 @@ class FlashJudge:
         )
         return (response.choices[0].message.content or "").strip()
 
-    async def judge_directory(self, directory: Path) -> dict:
-        transcript = compact_session(directory)
+    async def judge_directory(self, directory: Path, max_turns: int | None = None) -> dict:
+        transcript = compact_session(directory, max_turns=max_turns)
         messages = [
             {"role": "system", "content": JUDGE_SYSTEM},
             {
@@ -374,7 +402,12 @@ def summarize_scores(rows: list[dict]) -> dict:
             },
         }
 
-    model_stats = {tag: stats_for(items) for tag, items in by_model.items()}
+    model_stats = {
+        tag: stats_for(by_model[tag]) for tag in MODEL_ORDER if tag in by_model
+    }
+    for tag, items in by_model.items():
+        if tag not in model_stats:
+            model_stats[tag] = stats_for(items)
     pairwise = {"n": 0, "sft_wins": 0, "base_wins": 0, "ties": 0, "dimension_wins": {}}
     by_persona: dict[str, dict] = {}
     for row in rows:
@@ -411,50 +444,61 @@ def render_report(payload: dict) -> str:
     summary = payload.get("summary") or {}
     models = summary.get("models") or {}
     pairwise = summary.get("pairwise") or {}
+    present = [tag for tag in MODEL_ORDER if tag in models]
     lines = [
-        "# PaperTrail 4B 基座 vs SFT 对比",
+        "# PaperTrail 教师 flash vs 基座 4B vs SFT",
         "",
         f"- 评委：`{payload.get('judge_model')}`",
         f"- 运行：`{payload.get('run_id')}`",
-        f"- 人设：8 类 × 2 场 × 最多 {payload.get('max_turns')} 轮",
-        f"- 会话：{summary.get('n')} 条（每模型应各 16）",
+        f"- 人设协议：8 类 × 2 场 × 最多 {payload.get('max_turns')} 轮",
+        f"- 会话：{summary.get('n')} 条",
         "",
-        "## 总分",
-        "",
-        "| 模型 | n | 完成 | 总分均值 | 标准差 |",
-        "| --- | --- | --- | --- | --- |",
     ]
-    for tag in ("base", "sft"):
-        item = models.get(tag)
-        if not item:
-            continue
+    if "teacher" in models:
+        lines.extend(
+            [
+                "教师场次取自蒸馏 `constructed/`（`deepseek-v4-flash`），按同样 8 类 × 2 场抽样，"
+                "**只评前 10 轮**，不再重新对话。与 4B 不是同一段用户话，只对齐协议与评委。",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## 总分",
+            "",
+            "| 模型 | n | 完成 | 总分均值 | 标准差 |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for tag in present:
+        item = models[tag]
+        label = MODEL_LABELS.get(tag, tag)
         lines.append(
-            f"| {tag} | {item['n']} | {item['completed']} | "
+            f"| {label} (`{tag}`) | {item['n']} | {item['completed']} | "
             f"{item['overall_mean']:.3f} | {item['overall_std']:.3f} |"
         )
     lines.extend(["", "## 分维度均值（1–5）", ""])
-    header = "| 维度 | " + " | ".join(tag for tag in ("base", "sft") if tag in models) + " | Δ(sft-base) |"
+    header = "| 维度 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present)
+    header += " | Δ(sft-base) |" if {"base", "sft"} <= set(models) else " |"
     lines.append(header)
-    lines.append("| --- | " + " | ".join("---" for _ in ("base", "sft") if _ in models) + " | --- |")
+    sep = "| --- | " + " | ".join("---" for _ in present)
+    sep += " | --- |" if {"base", "sft"} <= set(models) else " |"
+    lines.append(sep)
     for key, label in DIMENSIONS.items():
         cells = [f"{key}<br>{label.split('：', 1)[0]}"]
         values = {}
-        for tag in ("base", "sft"):
-            if tag not in models:
-                continue
+        for tag in present:
             value = models[tag]["dimensions"][key]["mean"]
             values[tag] = value
             cells.append(f"{value:.3f}")
-        delta = ""
         if "base" in values and "sft" in values:
-            delta = f"{values['sft'] - values['base']:+.3f}"
-        cells.append(delta)
+            cells.append(f"{values['sft'] - values['base']:+.3f}")
         lines.append("| " + " | ".join(cells) + " |")
     if pairwise.get("n"):
         lines.extend(
             [
                 "",
-                "## 配对胜负（同一人设）",
+                "## 配对胜负（同一人设，仅 4B 基座 vs SFT）",
                 "",
                 f"- 配对数：{pairwise['n']}",
                 f"- SFT 胜：{pairwise.get('sft_wins')}  基座胜：{pairwise.get('base_wins')}  "
@@ -464,8 +508,8 @@ def render_report(payload: dict) -> str:
             ]
         )
     lines.extend(["", "## 自动指标均值", ""])
-    lines.append("| 指标 | base | sft |")
-    lines.append("| --- | --- | --- |")
+    lines.append("| 指标 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |")
+    lines.append("| --- | " + " | ".join("---" for _ in present) + " |")
     auto_keys = (
         "turns",
         "tool_calls",
@@ -486,23 +530,20 @@ def render_report(payload: dict) -> str:
     }
     for key in auto_keys:
         row = [labels[key]]
-        for tag in ("base", "sft"):
-            if tag not in models:
-                row.append("—")
-                continue
+        for tag in present:
             value = (models[tag].get("automatic") or {}).get(key)
             row.append("—" if value is None else f"{value:.3f}")
         lines.append("| " + " | ".join(row) + " |")
     lines.extend(["", "## 按角色总分", ""])
-    lines.append("| 角色 | base | sft |")
-    lines.append("| --- | --- | --- |")
+    lines.append("| 角色 | " + " | ".join(MODEL_LABELS.get(tag, tag) for tag in present) + " |")
+    lines.append("| --- | " + " | ".join("---" for _ in present) + " |")
     cats = set()
-    for tag in models:
+    for tag in present:
         cats.update((models[tag].get("by_category") or {}).keys())
     for cat in sorted(cats):
         row = [cat]
-        for tag in ("base", "sft"):
-            value = (models.get(tag, {}).get("by_category") or {}).get(cat)
+        for tag in present:
+            value = (models[tag].get("by_category") or {}).get(cat)
             row.append("—" if value is None else f"{value:.3f}")
         lines.append("| " + " | ".join(row) + " |")
     lines.append("")

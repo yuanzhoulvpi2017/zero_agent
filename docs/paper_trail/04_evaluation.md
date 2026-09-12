@@ -46,9 +46,9 @@ python interface/run_paper_trail.py --sft
 
 基座 4B 对比评测时用 `MODEL_KIND=base ./serve_vllm.sh`，配置见 [agent_base.toml](../../configs/paper_trail/agent_base.toml)。3090 同时只够挂一个 64k 实例，脚本会按 `sft → base` 切换。
 
-## 基座 4B vs SFT 批量对比
+## 基座 4B vs SFT vs 教师 flash
 
-协议：8 类虚拟人各 2 场，每场最多 10 轮。虚拟用户始终是 `deepseek-v4-flash`；小埋分别接未训练 Qwen3.5-4B 与合并后的 SFT。工具、系统提示、`max_iters` 和 `nothinking` 保持一致。轨迹写入 `data/paper_trail/eval/<run_id>/{base,sft}/`。
+协议：8 类虚拟人各 2 场，每场最多 10 轮。虚拟用户始终是 `deepseek-v4-flash`。小埋分别接未训练 Qwen3.5-4B 与合并后的 SFT（当场采集）。教师列**复用蒸馏已有轨迹**（`data/paper_trail/constructed/`，同 8 类 × 2 场、只评前 10 轮），不重新调用 flash 当助手。工具、系统提示对齐；4B 与教师不是同一段用户话，只对齐协议与评委。
 
 打分也用 `deepseek-v4-flash`，维度：
 
@@ -73,6 +73,10 @@ python evaluation/paper_trail/run_paper_trail_eval.py --dry-sample
 # 需要 DEEPSEEK_API_KEY；3090 上的 :8001 会被脚本切换
 python evaluation/paper_trail/run_paper_trail_eval.py
 
+# 给蒸馏里的教师 flash 补打分（不重新对话）
+python evaluation/paper_trail/run_paper_trail_eval.py \
+  --run-dir data/paper_trail/eval/<run_id> --skip-collect --skip-vllm-swap --score-teacher
+
 # 中断后续跑同一目录
 python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail/eval/<run_id>
 ```
@@ -81,16 +85,17 @@ python evaluation/paper_trail/run_paper_trail_eval.py --run-dir data/paper_trail
 
 ## 本次结果 · `compare-4b-20260911`
 
-评委 `deepseek-v4-flash`。8 类 × 2 场 × 10 轮，两模型各 16 场均完成。
+评委 `deepseek-v4-flash`。8 类 × 2 场 × 10 轮。4B 当场采集；教师从蒸馏轨迹抽样只评前 10 轮。
 
-**SFT 更会用工具，flash 总分略低于基座**（2.15 vs 2.32）。两者都约 2.1–2.3 / 5，主要扣幻觉。
+**教师 3.77，两个 4B 约 2.1–2.3。** SFT 工具行为靠近教师，依据和幻觉没有。
 
-| 模型 | 总分 | 工具调用 | 读论文 | arXiv 提及 | 字数 | 配对胜场 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 未训 4B | **2.32 ± 0.22** | 3.5 | 25% | 1.2 | 12207 | 10 |
-| SFT 4B | 2.15 ± 0.35 | **9.3** | **75%** | **5.7** | **7225** | 2（胜率 12.5%） |
+| 模型 | 总分 | 工具调用 | 读论文 | 幻觉论文标记 |
+| --- | --- | --- | --- | --- |
+| 教师 flash | **3.77 ± 0.40** | 18.8 | 81% | **2/16** |
+| 未训 4B | 2.32 ± 0.22 | 3.5 | 25% | 15/16 |
+| SFT 4B | 2.15 ± 0.35 | 9.3 | 75% | 16/16 |
 
-SFT 在工具使用、澄清上略高；人设适配、对话质量、身份、研究推进更低。评委给 SFT 16/16 场打了 `hallucinated_paper`。完整表见评测 README。
+完整表见 [evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)。
 
 ## 检查清单
 
@@ -98,4 +103,4 @@ SFT 在工具使用、澄清上略高；人设适配、对话质量、身份、�
 - [x] vLLM OpenAI 服务脚本（CUDA 预热 + 64k + qwen3 reasoning + qwen3_coder tools）
 - [x] 网页 `--sft` 指向本地推理
 - [x] 未训基座 vs SFT 的虚拟人批量对比（flash 打分）
-- [ ] 与商业模型（DeepSeek teacher）的同协议对比
+- [x] 与教师 flash 同协议对比（复用蒸馏轨迹，只评前 10 轮）

@@ -13,7 +13,7 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 - [x] 虚拟人采样与蒸馏采集入口（message + LLM 双端落盘，≤20 轮）。
 - [x] 轨迹 → SFT（`to_sft.py`，Qwen3.5 tools template + assistant-only mask）。
 - [x] TRL 双卡 QLoRA 完整 1 epoch（`max_length=16384`，见 [03_training.md](03_training.md)）。
-- [x] 本地 vLLM 部署合并后的 SFT，以及未训 4B vs SFT 的虚拟人对比评测（见 [04_evaluation.md](04_evaluation.md)、[evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)）。
+- [x] 本地 vLLM 部署合并后的 SFT，以及教师 flash / 未训 4B / SFT 的虚拟人同协议对比（见 [04_evaluation.md](04_evaluation.md)、[evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)）。
 
 代码：[Agent](../../agent/paper_trail/)、[界面](../../interface/paper_trail/)、[配置](../../configs/paper_trail/agent.toml)、[数据/蒸馏](../../dataset/paper_trail_data/)。
 
@@ -44,11 +44,13 @@ python interface/run_paper_trail_collect.py --dry-sample --count 1
 python interface/run_paper_trail_collect.py --count 1 --max-turns 3
 ```
 
-4B 基座 vs SFT 对比评测（8 类人设 × 2 场 × 最多 10 轮，flash 打分）：
+教师 flash / 基座 4B / SFT 对比评测（8 类人设 × 2 场 × 最多 10 轮，flash 打分；教师列复用蒸馏轨迹）：
 
 ```bash
 python evaluation/paper_trail/run_paper_trail_eval.py --dry-sample
 python evaluation/paper_trail/run_paper_trail_eval.py
+python evaluation/paper_trail/run_paper_trail_eval.py \
+  --run-dir data/paper_trail/eval/<run_id> --skip-collect --skip-vllm-swap --score-teacher
 ```
 
 界面环境通过本地可编辑依赖安装 `agent/` 包，调用其公开的会话接口。仅开发后端时可运行 `uv sync --project agent`。根目录教程环境不受影响。
