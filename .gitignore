@@ -237,3 +237,4 @@ test_*
 
 hz_test*.md
 model
+temp/

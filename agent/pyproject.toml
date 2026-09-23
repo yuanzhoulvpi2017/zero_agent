@@ -2,7 +2,7 @@
 name = "zero-agent-business"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["agentscope>=1.0.18,<2.0.0", "httpx>=0.28,<1", "mcp>=1.26,<2", "python-dotenv>=1,<2", "tqdm>=4.66,<5"]
+dependencies = ["agentscope>=1.0.18,<2.0.0", "httpx>=0.28,<1", "mcp>=1.26,<2", "python-dotenv>=1,<2", "rich>=14,<15", "tqdm>=4.66,<5"]
 
 [build-system]
 requires = ["hatchling"]

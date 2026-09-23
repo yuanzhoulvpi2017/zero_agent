@@ -8,6 +8,7 @@ dependencies = [
     "agentscope>=1.0.18,<2.0.0",
     "fastapi>=0.135.2",
     "jupyter>=1.1.1",
+    "json5>=0.14.0",
     "lunardate>=0.2.2",
     "mcp[cli]>=1.26.0",
     "modelscope>=1.40.0",

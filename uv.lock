@@ -3519,6 +3519,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "agentscope" },
     { name = "fastapi" },
+    { name = "json5" },
     { name = "jupyter" },
     { name = "lunardate" },
     { name = "mcp", extra = ["cli"] },
@@ -3537,6 +3538,7 @@ dependencies = [
 requires-dist = [
     { name = "agentscope", specifier = ">=1.0.18,<2.0.0" },
     { name = "fastapi", specifier = ">=0.135.2" },
+    { name = "json5", specifier = ">=0.14.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "lunardate", specifier = ">=0.2.2" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.26.0" },
