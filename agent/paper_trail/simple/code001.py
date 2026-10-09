@@ -13,6 +13,7 @@ from agentscope.tool import Toolkit
 import httpx
 import os
 from paper_trail.cache import ResponseCache
+from paper_trail.runtime import MeteredModel
 from pathlib import Path
 from datetime import datetime, timezone
 from agentscope.model import OpenAIChatModel
