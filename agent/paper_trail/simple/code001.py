@@ -1,6 +1,8 @@
 """
 介绍如何蒸馏deepseek 模型
 
+uv run agent/paper_trail/simple/code001.py
+
 """
 
 from paper_trail.runtime import DeepSeekFormatter
