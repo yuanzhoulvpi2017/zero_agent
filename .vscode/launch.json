@@ -21,6 +21,16 @@
             },
             "envFile": "${workspaceFolder}/configs/paper_trail/.env",
             "justMyCode": false
+        },
+        {
+            "name": "PaperTrail: 附加调试 code001",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5678
+            },
+            "justMyCode": false
         }
     ],
     "version": "0.2.0"

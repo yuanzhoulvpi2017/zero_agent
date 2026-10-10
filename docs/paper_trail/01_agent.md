@@ -72,3 +72,11 @@ uv run --project agent agent/paper_trail/simple/code001.py
 - [x] [.vscode/launch.json](../../.vscode/launch.json) 提供 `PaperTrail: 调试 code001`。
 
 用 VS Code 打开仓库根目录，安装 Python 与 Python Debugger 扩展。在“运行和调试”中选择该启动项，设置断点后按 F5；对话输入在集成终端进行。配置使用根目录 `.venv/bin/python`（对应根目录的 `uv run` 环境），工作目录固定为仓库根目录，并通过 `PYTHONPATH` 加入 `agent/`。环境变量可由 `configs/paper_trail/.env` 提供。`justMyCode: false` 允许进入 AgentScope 等依赖源码。
+
+如果自动激活命令被误读为聊天输入，可使用附加调试，不更改普通终端设置。在已打开且环境激活完成的终端，从仓库根目录运行：
+
+```bash
+PYTHONPATH="$PWD/agent${PYTHONPATH:+:$PYTHONPATH}" uv run python -m debugpy --listen 127.0.0.1:5678 --wait-for-client agent/paper_trail/simple/code001.py
+```
+
+然后选择 `PaperTrail: 附加调试 code001` 并按 F5，程序会在连接后开始运行，对话仍在原终端输入。该方式需要 uv 环境中有 debugpy（当前根目录环境已安装），VS Code 不会创建新的调试终端。
