@@ -66,3 +66,9 @@ uv run --project agent agent/paper_trail/simple/code001.py
 终端会显示记录目录，默认是 `data/paper_trail/simple/<随机会话ID>/`。`RecordingModel(directory=Path(...), **模型参数)` 可指定目录；相对路径按仓库根目录解析。每次模型调用保存 `turn_001_call_001_<唯一ID>.json`，中文直接显示并缩进。一句用户输入可能触发多次模型调用，它们的 `turn_index` 相同、`call_index` 递增。
 
 `manifest_<唯一ID>.json` 记录代码提交与实际配置，尚未执行的数据处理、训练、评测留空。调用 JSON 包含模型标识、时间、请求消息与工具定义、回复正文、thinking、工具调用、token 用量、耗时和执行状态。工具返回出现在下一次模型请求的 `request.messages` 中。流式输出原样传递给 Agent；文件先记录 running，再在结束时保存最终累计结果，失败或中断也保留已获得的内容。此记录是模型调用视角，尚未再次发送给模型的工具结果不会包含在其中。真实密钥会脱敏，产物不提交 Git。
+
+### VS Code 调试教学示例
+
+- [x] [.vscode/launch.json](../../.vscode/launch.json) 提供 `PaperTrail: 调试 code001`。
+
+用 VS Code 打开仓库根目录，安装 Python 与 Python Debugger 扩展。在“运行和调试”中选择该启动项，设置断点后按 F5；对话输入在集成终端进行。配置使用根目录 `.venv/bin/python`（对应根目录的 `uv run` 环境），工作目录固定为仓库根目录，并通过 `PYTHONPATH` 加入 `agent/`。环境变量可由 `configs/paper_trail/.env` 提供。`justMyCode: false` 允许进入 AgentScope 等依赖源码。

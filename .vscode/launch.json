@@ -7,6 +7,21 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+        {
+            "name": "PaperTrail: 调试 code001",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "program": "${workspaceFolder}/agent/paper_trail/simple/code001.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/agent:${env:PYTHONPATH}"
+            },
+            "envFile": "${workspaceFolder}/configs/paper_trail/.env",
+            "justMyCode": false
         }
-    ]
+    ],
+    "version": "0.2.0"
 }
