@@ -52,3 +52,17 @@ interface/.venv/bin/python -m unittest paper_trail.checks.check_compact paper_tr
 覆盖缓存合并与 TTL、工具截断与 ID 校验、thinking 在多轮 assistant 消息中的对齐、流式工具循环，以及对话标题、conversation.json 与磁盘恢复。
 
 界面启动与 API 见 [05_interface.md](05_interface.md)。
+
+## 教学示例：逐次保存模型调用
+
+- [x] [code001.py](../../agent/paper_trail/simple/code001.py) 接入 [RecordingModel](../../agent/paper_trail/simple/recording_model.py)，保留原有聊天与工具流程。
+
+在仓库根目录运行（密钥配置同上）：
+
+```bash
+uv run --project agent agent/paper_trail/simple/code001.py
+```
+
+终端会显示记录目录，默认是 `data/paper_trail/simple/<随机会话ID>/`。`RecordingModel(directory=Path(...), **模型参数)` 可指定目录；相对路径按仓库根目录解析。每次模型调用保存 `turn_001_call_001_<唯一ID>.json`，中文直接显示并缩进。一句用户输入可能触发多次模型调用，它们的 `turn_index` 相同、`call_index` 递增。
+
+`manifest_<唯一ID>.json` 记录代码提交与实际配置，尚未执行的数据处理、训练、评测留空。调用 JSON 包含模型标识、时间、请求消息与工具定义、回复正文、thinking、工具调用、token 用量、耗时和执行状态。工具返回出现在下一次模型请求的 `request.messages` 中。流式输出原样传递给 Agent；文件先记录 running，再在结束时保存最终累计结果，失败或中断也保留已获得的内容。此记录是模型调用视角，尚未再次发送给模型的工具结果不会包含在其中。真实密钥会脱敏，产物不提交 Git。
