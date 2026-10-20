@@ -80,3 +80,23 @@ PYTHONPATH="$PWD/agent${PYTHONPATH:+:$PYTHONPATH}" uv run python -m debugpy --li
 ```
 
 然后选择 `PaperTrail: 附加调试 code001` 并按 F5，程序会在连接后开始运行，对话仍在原终端输入。该方式需要 uv 环境中有 debugpy（当前根目录环境已安装），VS Code 不会创建新的调试终端。
+
+### 教学示例：虚拟人与 code001 自动对话
+
+- [x] [code001_fakeuser.py](../../agent/paper_trail/simple/code001_fakeuser.py) 复用现有 8 类、16 个角色模板和 `VirtualUser`，直接调用 `code001.PaperSession.chat()`，终端展示人设、逐轮发言及小埋的流式回复和工具调用。
+
+在仓库根目录、使用上述 Agent 环境运行：
+
+```bash
+uv run --project agent agent/paper_trail/simple/code001_fakeuser.py --list
+uv run --project agent agent/paper_trail/simple/code001_fakeuser.py --dry-run --seed 42
+uv run --project agent agent/paper_trail/simple/code001_fakeuser.py --category industry_engineer --turns 3 --seed 42
+```
+
+默认随机角色、3 轮，最多 20 轮；`--seed` 固定人设采样，模型发言仍可能变化。`--list` 和 `--dry-run` 不需要密钥，也不请求模型。正式运行需要 `DEEPSEEK_API_KEY`；小埋读取 `configs/paper_trail/agent.toml`，虚拟人沿用 `VirtualUser` 的 `user_llm_settings()` 配置。每轮将双方此前的完整对话交给虚拟人生成下一句话。
+
+输出在 `data/paper_trail/simple/<随机会话ID>/`，相对路径均按仓库根目录解析。除原有模型调用和 manifest 外，保存 `persona.json`、`virtual_user_config.json`、`virtual_user_calls.json` 和 `conversation.json`（人设、状态、逐轮动作及用户/助手正文）；失败或中断保留已有记录。这是终端教学演示入口。
+
+VS Code 调试：在“运行和调试”中选择 `PaperTrail: 调试 code001_fakeuser`，按 F5。默认参数为 `--turns 3 --seed 42`，可在 [.vscode/launch.json](../../.vscode/launch.json) 的 `args` 中修改；解释器和环境配置沿用 `code001` 的调试入口。
+
+两个教学脚本的调试入口在 `NO_PROXY` / `no_proxy` 中加入 `api.deepseek.com,huggingface.co,hf.co`，让模型和论文工具直连，避免 VS Code 继承的不可用代理导致模型 `APIConnectionError` 或工具“网络请求失败”；其他域名仍沿用原有代理配置。若修改 API 域名，需要同步调整此项。

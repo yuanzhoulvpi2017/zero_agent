@@ -17,10 +17,34 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/agent:${env:PYTHONPATH}"
+                "PYTHONPATH": "${workspaceFolder}/agent:${env:PYTHONPATH}",
+                "NO_PROXY": "api.deepseek.com,huggingface.co,hf.co,${env:NO_PROXY}",
+                "no_proxy": "api.deepseek.com,huggingface.co,hf.co,${env:no_proxy}"
             },
             "envFile": "${workspaceFolder}/configs/paper_trail/.env",
             "justMyCode": false
+        },
+        {
+            "name": "PaperTrail: 调试 code001_fakeuser",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "program": "${workspaceFolder}/agent/paper_trail/simple/code001_fakeuser.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/agent:${env:PYTHONPATH}",
+                // "NO_PROXY": "api.deepseek.com,huggingface.co,hf.co,${env:NO_PROXY}",
+                // "no_proxy": "api.deepseek.com,huggingface.co,hf.co,${env:no_proxy}"
+            },
+            "envFile": "${workspaceFolder}/configs/paper_trail/.env",
+            "justMyCode": false,
+            "args": [
+                "--turns",
+                "3",
+                "--seed",
+                "42"
+            ]
         },
         {
             "name": "PaperTrail: 附加调试 code001",
