@@ -12,6 +12,7 @@ Agent 名称为「小埋」，由 B站 UP主「良睦路程序员」创建。项
 - [x] 本地多轮流式聊天网页、实时状态、会话轨迹，以及可回看、可继续的对话记录。
 - [x] 虚拟人采样与蒸馏采集入口（message + LLM 双端落盘，≤20 轮）。
 - [x] 轨迹 → SFT（`to_sft.py`，Qwen3.5 tools template + assistant-only mask）。
+- [x] simple 全量日志 → 清洗 SFT → loss mask 统一教学入口（[code002_to_sft.py](../../agent/paper_trail/simple/code002_to_sft.py)，运行与检查索引见 [02_dataset.md](02_dataset.md#simple-日志转换教学示例)，mask 算法见 [03_training.md](03_training.md#loss-mask-教学示例仅分词)）。
 - [x] TRL 双卡 QLoRA 完整 1 epoch（`max_length=16384`，见 [03_training.md](03_training.md)）。
 - [x] 本地 vLLM 部署合并后的 SFT，以及教师 flash / 未训 4B / SFT 的虚拟人同协议对比（见 [04_evaluation.md](04_evaluation.md)、[evaluation/paper_trail/README.md](../../evaluation/paper_trail/README.md)）。
 

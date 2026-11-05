@@ -73,6 +73,44 @@ interface/.venv/bin/python dataset/paper_trail_data/quality.py
 
 ## 转 SFT
 
+### simple 日志转换教学示例
+
+- [x] [code002_to_sft.py](../../agent/paper_trail/simple/code002_to_sft.py)：一个入口完成原始 model logs → SFT 清洗 → **全部会话、全部调用**的 loss mask 检查；原 code003 已合并移除。
+
+从仓库根目录运行，复用训练环境中的 Transformers / PyTorch，仅加载本地 tokenizer，不加载模型或训练：
+
+```bash
+training/paper_trail/.venv/bin/python agent/paper_trail/simple/code002_to_sft.py
+# 指定一个会话；输出目录必须尚不存在
+training/paper_trail/.venv/bin/python agent/paper_trail/simple/code002_to_sft.py \
+  --input data/paper_trail/simple/<session_id> \
+  --output-dir data/paper_trail/mask_demo/my_demo
+```
+
+相对路径以仓库根目录解析，与执行目录无关。默认输入为 `data/paper_trail/simple/`，递归读取所有 `turn_*_call_*.json`，排除虚拟人调用、conversation 和 manifest。仅使用 `status=completed` 且请求和回复非空的调用；纯工具调用也有效。未完成或空调用计入跳过统计；损坏日志、缺失 schema 或 token 前缀不匹配均报出来源路径，不静默漏掉。所有样本通过转换及前缀检查后才写出新批次。
+
+清洗规则：去掉目标和历史 assistant 的 reasoning；**任何有 tool_calls 的 assistant 都清空 content，只保留结构化调用和参数**。不带 tool_calls 的 assistant 保留回复正文。工具返回、工具 schema 和原始日志不改。每份日志转为一条样本，messages 为清洗后的历史加本次输出，tools 保留完整定义。
+
+默认输出 `data/paper_trail/mask_demo/<时间_UUID>/`：
+
+| 文件 / 目录 | 内容 |
+| --- | --- |
+| `README.md` / `index.json` | 全部会话和调用的索引，逐条链接检查结果 |
+| `samples.jsonl` | 全量清洗后 SFT messages、tools、来源元信息 |
+| `encoded.jsonl` | 与 samples 逐行对应的 input_ids、attention_mask、loss_mask、labels |
+| `all_mask_segments.txt` | 所有样本的 mask 区段汇总 |
+| `sessions/<session_id>/<日志名>/` | 每次调用的 sample.json、batch.json、tokens.tsv、rendered.txt、prompt.txt、mask_segments.txt、supervised.txt |
+| `original_template.jinja` | 未经修改的模型原始模板 |
+| `manifest.json` | 来源哈希、实际配置、代码版本、会话数、SFT 数、mask 数和跳过统计 |
+
+`data/paper_trail/mask_demo/README.md` 指向当前全量批次。旧目录保留为历史记录，包含不同旧模板和单条示例，不再作为当前检查依据。原始日志保持不变，不覆盖旧批次。
+
+每次调用只监督本次末尾输出；工具调用样本只监督调用本身，回复样本监督正文。训练接入时必须保留 `encoded.jsonl` 的 labels；直接把 `samples.jsonl` 交给监督所有 assistant 的 Trainer，会改变这里展示的 mask。token 前缀算法及空 think 边界见 [03_training.md](03_training.md#loss-mask-教学示例仅分词)。
+
+产物尚未划分训练 / 测试集；训练前按会话或任务留出测试集，并检查目标模型长度。当前示例保留完整序列，不截断。
+
+### 批量采集日志转换
+
 把 `llm_calls.json` 转成 Qwen3.5 可用的对话样本（含 tools schema；**默认去掉 teacher thinking**）：
 
 ```bash
